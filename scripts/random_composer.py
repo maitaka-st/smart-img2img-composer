@@ -879,9 +879,18 @@ class RandomComposerScript(scripts.Script):
             )
         return [enabled, override_prompt]
 
+    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
+        self._run_composer(p, enabled, override_prompt)
+
     def process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
+        self._run_composer(p, enabled, override_prompt)
+
+    def _run_composer(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
         if not enabled:
             return
+        if getattr(p, "_smart_composer_ran", False):
+            return
+        p._smart_composer_ran = True
 
         config = load_config()
         selected, positive, negative, log = compose_prompt(
@@ -896,7 +905,11 @@ class RandomComposerScript(scripts.Script):
 
         if selected:
             try:
-                p.init_images = [Image.open(selected).convert("RGB")]
+                img = Image.open(selected).convert("RGB")
+                p.init_images = [img]
+                new_w, new_h = get_stable_dimensions(img)
+                p.width = new_w
+                p.height = new_h
             except Exception as e:
                 print(f"[Smart Img2Img Composer] 画像読み込み失敗: {e}")
 
