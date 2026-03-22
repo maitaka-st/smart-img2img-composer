@@ -301,7 +301,8 @@ def save_settings(image_folder, memo_file, match_threshold, generation_count, fa
     return save_config(config)
 
 
-def save_gen_settings(confidence, pos, neg, custom, categories):
+def save_gen_settings(confidence, pos, neg, custom, cat_base, cat_char, cat_nsfw):
+    categories = cat_base + cat_char + cat_nsfw
     config = load_config()
     config.update({
         "gen_confidence": confidence,
@@ -725,8 +726,9 @@ def get_stable_dimensions(img):
     new_h = max(64, round(new_h / 64) * 64)
     return new_w, new_h
 
-def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, gen_categories, custom_dict_str):
+def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_base, cat_char, cat_nsfw, custom_dict_str):
     """画像を解析してメモエントリを生成"""
+    gen_categories = cat_base + cat_char + cat_nsfw
     if image is None:
         return "", "❌ 画像をアップロードしてください"
 
@@ -1010,12 +1012,31 @@ def on_ui_tabs():
                         placeholder="例: タイトル1",
                         info="メモファイルの [セクション名] になる",
                     )
-                    gen_categories = gr.CheckboxGroup(
-                        label="🏷️ 抽出するタグの種類",
-                        choices=list(_TAG_CATEGORIES.keys()),
-                        value=lambda: load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())),
-                        info="チェックした種類のタグだけを抽出します"
-                    )
+                    # --- アコーディオン化されたタグカテゴリ ---
+                    _cat_base = ["構図・カメラ", "ポーズ・アクション", "背景・場所", "自然・天候", "照明", "雰囲気", "メタタグ"]
+                    _cat_char = ["人物・基本属性", "髪型・顔周り", "表情・口", "服装・靴・装飾品"]
+                    _cat_nsfw = ["🎭 行為・アクション", "🦑 クリーチャー・追加キャラ", "🧸 アイテム・玩具", "🔞 特殊構図・フォーカス", "💦 体液・汚れ系", "🥵 表情・フェティッシュ状態", "👗 衣服の乱れ・着脱"]
+                    
+                    gr.Markdown("### 🏷️ 抽出するタグの種類（チェックした種類のタグだけを抽出します）")
+                    with gr.Accordion("🖼️ 基本カテゴリ (構図・背景など)", open=True):
+                        gen_cat_base = gr.CheckboxGroup(
+                            choices=_cat_base,
+                            value=lambda: [c for c in load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())) if c in _cat_base],
+                            show_label=False
+                        )
+                    with gr.Accordion("👩 人物・詳細カテゴリ (髪型・服装など)", open=False):
+                        gen_cat_char = gr.CheckboxGroup(
+                            choices=_cat_char,
+                            value=lambda: [c for c in load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())) if c in _cat_char],
+                            show_label=False
+                        )
+                    with gr.Accordion("🔞 特殊・NSFWカテゴリ (行為・アイテム等)", open=False):
+                        gen_cat_nsfw = gr.CheckboxGroup(
+                            choices=_cat_nsfw,
+                            value=lambda: [c for c in load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())) if c in _cat_nsfw],
+                            show_label=False
+                        )
+                    # --------------------------------------
                     gen_confidence = gr.Slider(
                         label="🎯 タグ信頼度しきい値",
                         minimum=0.1, maximum=0.9, step=0.05,
@@ -1088,7 +1109,7 @@ def on_ui_tabs():
 
             gen_btn.click(
                 fn=autogen_prompt,
-                inputs=[gen_image, gen_section, gen_confidence, gen_positive, gen_negative, gen_categories, gen_custom_dict],
+                inputs=[gen_image, gen_section, gen_confidence, gen_positive, gen_negative, gen_cat_base, gen_cat_char, gen_cat_nsfw, gen_custom_dict],
                 outputs=[gen_output, gen_log, hidden_gen_pos, hidden_gen_neg, hidden_gen_w, hidden_gen_h],
             )
             
@@ -1138,7 +1159,7 @@ def on_ui_tabs():
             )
             gen_save_btn.click(
                 fn=save_gen_settings,
-                inputs=[gen_confidence, gen_positive, gen_negative, gen_custom_dict, gen_categories],
+                inputs=[gen_confidence, gen_positive, gen_negative, gen_custom_dict, gen_cat_base, gen_cat_char, gen_cat_nsfw],
                 outputs=[gen_save_status],
             )
 
