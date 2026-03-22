@@ -482,8 +482,8 @@ _TAG_CATEGORIES = {
         "hair_ribbon", "re:^hairband", "re:^headpiece", "re:^headwear", "bag", "re:^backpack",
         "re:^purse", "re:^handbag", "umbrella", "parasol", "re:^weapon", "sword", "gun", "staff",
         "wand", "shield", "spear", "axe", "knife", "dagger", "mask", "re:^eyepatch", "re:^wing",
-        "tail", "re:^horn", "halo", "belt", "re:^buckle", "re:^strap", "re:^sleeve", "re:^pocket",
-        "re:^zipper", "re:^button", "hood", "re:^hooded"
+        "re:^zipper", "re:^button", "hood", "re:^hooded",
+        "jirai_kei", "yami_kawaii", "cybergoth", "wa_lolita", "qi_lolita", "zettai_ryouiki"
     },
     "🎭 行為・アクション": {
         "sex", "kissing", "hugging", "embracing", "holding_hands",
@@ -499,6 +499,16 @@ _TAG_CATEGORIES = {
         "facesitting", "smothering", "breast_smother", "double_penetration", "triple_penetration", 
         "futa_with_futa", "futa_on_female", "choking", "asphyxiation", "spitroast", "thigh_sex", 
         "armpit_sex", "deepthroat",
+        "prone_bone", "lying_on_back", "glory_wall", "standing_sex", "standing_split_sex", "anvil_position",
+        "girl_on_top", "boy_on_top", "straddling", "upright_straddle", "reverse_upright_straddle",
+        "suspended_congress", "reverse_suspended_congress", "full_nelson", "cooperative_paizuri",
+        "69_position", "buttjob", "straddling_paizuri", "piledriver_sex", "amazon_position",
+        "human_stacking", "grinding", "mutual_fingering", "breast_press", "breast_sucking",
+        "self_breast_sucking", "groping", "symmetrical_docking", "torso_grab", "handjob_over_clothes",
+        "fingering_through_clothes", "fingering_through_panties", "hand_in_another's_panties",
+        "tail_masturbation", "stealth_masturbation", "clothed_masturbation", "female_masturbation",
+        "male_masturbation", "clitoral_stimulation", "nipple_pull", "box_tie", "frogtie", "hogtie",
+        "shrimp_tie", "strappado", "bound_breasts", "bound_wrists", "bound_ankles", "femdom", "defloration",
         "re:^tentacle", "mind_control", "hypnosis"
     },
     "🦑 クリーチャー・追加キャラ": {
@@ -514,13 +524,16 @@ _TAG_CATEGORIES = {
         "weapon", "sword", "gun", "knife", "bow", "shield",
         "book", "phone", "smartphone", "laptop", "bag",
         "cup", "glass", "bottle", "plate", "food",
-        "re:^wand", "staff", "magic", "cigarette", "pipe"
+        "re:^wand", "staff", "magic", "cigarette", "pipe",
+        "suction_cup_dildo", "used_condom", "hitachi_magic_wand", "crotch_tattoo",
+        "crotch_rope", "milking_machine", "breast_pump", "dilation_tape"
     },
     "🔞 特殊構図・フォーカス": {
         "x-ray", "cross-section", "internal_cumshot", "womb", "stomach_deformation",
         "pov", "focus_on_breasts", "focus_on_ass", "focus_on_crotch", "focus_on_thighs", "cameltoe",
         "ass_focus", "breast_focus", "crotch_focus", "thigh_focus", "foot_focus", "armpit_focus",
         "impregnation", "stomach_bulge", "throat_bulge",
+        "before_sex", "after_sex", "after_vaginal", "fucked_silly", "cross-section",
         "close-up", "macro", "from_below", "from_above", "dutch_angle"
     },
     "💦 体液・汚れ系": {
@@ -530,7 +543,10 @@ _TAG_CATEGORIES = {
         "sweat", "sweatdrop", "saliva", "drool", "tears", "crying",
         "messy", "dirty", "covered_in_cum", "wet", "wet_clothes", "wet_hair",
         "urine", "peeing", "squirt", "love_nectar",
-        "lactation", "breast_milk", "milk", "pussy_juice", "menstruation"
+        "lactation", "breast_milk", "milk", "pussy_juice", "menstruation",
+        "cum_drip_creampie", "cum_on_body", "cum_on_clothes", "pussy_juice_drip",
+        "pussy_juice_puddle", "pussy_juice_trail", "pussy_juice_stain", "wet_panty",
+        "wet_stain_on_panty", "drinking_pee", "peeing_in_cup", "public_urination", "peeing_self"
     },
     "🥵 表情・フェティッシュ状態": {
         "ahegao", "heart-shaped_pupils", "rolled_back_eyes", "empty_eyes", "crazy_eyes",
@@ -544,6 +560,9 @@ _TAG_CATEGORIES = {
         "micro_bikini", "slingshot_swimsuit", "pasties",
         "nip_slip", "wardrobe_malfunction", "torn_clothes", "see-through",
         "panty_pull", "bra_pull", "no_panties", "no_bra", "breast_spilling_over", "crotchless_panties",
+        "panty_around_knees", "panties_aside", "panties_around_ankles", "panties_around_one_leg",
+        "panties_on_head", "pantyshot", "adjusting_panties", "holding_panties", "licking_panties",
+        "panty_lift", "smelling_underwear", "wedgie", "tentacles_under_clothes",
         "naked", "nude", "topless", "bottomless"
     },
     "🍆 局所・モザイク": {
@@ -552,7 +571,11 @@ _TAG_CATEGORIES = {
         "huge_penis", "monster_penis", "horse_penis", "tentacle_penetration", "multiple_penises", "futanari",
         "uncensored", "censored", "bar_censor", "mosaic_censoring", "censor_steam",
         "holding_penis", "rubbing_penis", "fucking_machine", "glory_hole", "crotch",
-        "nipples", "erect_nipples", "areola", "ass", "asshole", "butt"
+        "nipples", "erect_nipples", "areola", "ass", "asshole", "butt",
+        "spread_pussy", "gaping", "cleft_of_venus", "wet_shiny_vagina", "cervix",
+        "urethra", "groin_tendon", "clitoral_hood", "erect_clitoris", "clitoris_slip",
+        "puffy_nipples", "inverted_nipples", "presenting_nipples", "presenting_crotch",
+        "ofuda_on_pussy", "futa_with_female", "ovum", "fertilization", "sperm_cell"
     },
     "メタタグ": {
         "highres", "absurdres", "masterpiece", "best_quality", "re:_quality$", "re:^rating_",
