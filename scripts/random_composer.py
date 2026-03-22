@@ -484,6 +484,30 @@ _TAG_CATEGORIES = {
         "tail", "re:^horn", "halo", "belt", "re:^buckle", "re:^strap", "re:^sleeve", "re:^pocket",
         "re:^zipper", "re:^button", "hood", "re:^hooded"
     },
+    "🎭 行為・アクション": {
+        "sex", "kissing", "hugging", "embracing", "holding_hands",
+        "bound", "tied_up", "shibari", "rope", "gag", "gagged",
+        "blindfold", "blindfolded", "chained", "cuffs", "handcuffs",
+        "sleeping", "crying", "drinking", "eating",
+        "fighting", "punching", "kicking", "slapping",
+        "petting", "stroking", "licking", "sucking", "biting",
+        "re:^tentacle", "mind_control", "hypnosis"
+    },
+    "🦑 クリーチャー・追加キャラ": {
+        "monster", "creature", "demon", "devil", "angel",
+        "orc", "goblin", "elf", "beast", "dragon",
+        "slime", "tentacles", "alien", "ghost", "zombie",
+        "robot", "cyborg", "android", "mecha",
+        "animal", "dog", "cat", "bird", "fish", "horse", "wolf", "fox"
+    },
+    "🧸 アイテム・玩具": {
+        "toy", "sex_toy", "vibrator", "dildo", "plug", "magic_wand",
+        "whip", "crop", "leash", "collar",
+        "weapon", "sword", "gun", "knife", "bow", "shield",
+        "book", "phone", "smartphone", "laptop", "bag",
+        "cup", "glass", "bottle", "plate", "food",
+        "re:^wand", "staff", "magic", "cigarette", "pipe"
+    },
     "メタタグ": {
         "highres", "absurdres", "masterpiece", "best_quality", "re:_quality$", "re:^rating_",
         "re:^score_", "realistic", "anime", "manga", "official_art", "key_visual",
