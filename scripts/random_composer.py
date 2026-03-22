@@ -452,7 +452,7 @@ _TAG_CATEGORIES = {
     },
     "人物・基本属性": {
         "re:^\\d+girl", "re:^\\d+boy", "solo", "duo", "trio", "multiple_girls", "multiple_boys",
-        "couple", "group", "breast", "re:^slim$", "re:^muscular", "petite", "chubby",
+        "couple", "group", "re:.*breasts?$", "re:^slim$", "re:^muscular", "petite", "chubby",
         "thick_thighs", "wide_hips", "narrow_waist", "abs", "navel", "midriff", "cleavage",
         "collarbone", "re:^shoulder", "re:_skin$", "re:^skin_", "pale", "tan", "re:^dark_skin",
         "re:^nail", "re:^lip", "ear", "ears", "nose", "mole", "scar", "tattoo", "freckle"
@@ -492,6 +492,10 @@ _TAG_CATEGORIES = {
         "sleeping", "crying", "drinking", "eating",
         "fighting", "punching", "kicking", "slapping",
         "petting", "stroking", "licking", "sucking", "biting",
+        "missionary", "doggystyle", "paizuri", "blowjob", "handjob", "footjob", "titfuck",
+        "masturbation", "fingering", "cunnilingus", "anilingus", "anal", "vaginal", "oral",
+        "tribadism", "reverse_cowgirl_position", "cowgirl_position", "mating_press", "spanking",
+        "threesome", "group_sex", "gangbang", "orgy",
         "re:^tentacle", "mind_control", "hypnosis"
     },
     "🦑 クリーチャー・追加キャラ": {
@@ -520,7 +524,8 @@ _TAG_CATEGORIES = {
         "semen", "sperm", "ejaculation", "facial", "bukkake",
         "sweat", "sweatdrop", "saliva", "drool", "tears", "crying",
         "messy", "dirty", "covered_in_cum", "wet", "wet_clothes", "wet_hair",
-        "urine", "peeing", "squirt", "love_nectar"
+        "urine", "peeing", "squirt", "love_nectar",
+        "lactation", "breast_milk", "milk", "pussy_juice", "menstruation"
     },
     "🥵 表情・フェティッシュ状態": {
         "ahegao", "heart-shaped_pupils", "rolled_back_eyes", "empty_eyes", "crazy_eyes",
@@ -539,7 +544,8 @@ _TAG_CATEGORIES = {
         "penis", "balls", "testicles", "erection", "vein", "precum", "foreskin",
         "pussy", "vagina", "clitoris", "labia", "cameltoe", "pubic_hair", "anus",
         "uncensored", "censored", "bar_censor", "mosaic_censoring", "censor_steam",
-        "holding_penis", "rubbing_penis", "fucking_machine", "glory_hole", "crotch"
+        "holding_penis", "rubbing_penis", "fucking_machine", "glory_hole", "crotch",
+        "nipples", "erect_nipples", "areola", "ass", "asshole", "butt"
     },
     "メタタグ": {
         "highres", "absurdres", "masterpiece", "best_quality", "re:_quality$", "re:^rating_",
