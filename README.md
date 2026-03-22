@@ -79,7 +79,8 @@ You can define a `lora:` block inside any your memo sections. Provide the LoRA n
 
 ## 🤖 WD14 integration & Conditional prompt injection
 If you don't want to type memo files manually, use the **🏷️ Prompt Auto-Generation** tab!
-- **WD14 Integration**: Upload an image, and it extracts tags (scenes, poses, composition, lighting). Unwanted tags like "character clothing" or "eye color" are filtered transparently based on safe category settings.
+- **WD14 Integration**: Upload an image, and it extracts tags (scenes, poses, composition, lighting, characters, and NSFW). Unwanted tags are filtered transparently based on category settings.
+  * 🔞 **Advanced NSFW & Fetish Tag Extraction**: Contains a massive built-in dictionary that flawlessly captures highly specific sexual acts, bodily fluids, genital/mosaic states, and maniac fetishes that are usually lost during regular tag filtering.
 - **Conditional Prompt Injection**: You can set dictionaries to automatically inject highly detailed stylistic tags into the generated memo text when specific trigger words are detected. Example:
   ```text
   night, city > cyberpunk cityscape, neon lights, cinematic lighting, rain reflections, highly detailed
