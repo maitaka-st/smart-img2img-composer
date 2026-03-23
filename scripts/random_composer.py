@@ -209,7 +209,7 @@ def check_lora_exists(lora_str: str) -> bool:
         pass
     return True
 
-def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, selection_mode="ランダムに選ぶ") -> tuple:
+def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, selection_mode="Random") -> tuple:
     """戻り値: (画像パス, positive, negative, ログ)"""
     log = []
     config = load_config()
@@ -218,9 +218,9 @@ def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, se
 
     image_files = get_image_files(image_folder)
     if not image_files:
-        return None, "", "", "❌ 画像フォルダに画像がありません"
+        return None, "", "", "❌ No images found in the folder"
 
-    if "順番" in selection_mode:
+    if "Sequential" in selection_mode:
         last_index = config.get("last_sequential_index", 0)
         index = last_index % len(image_files)
         selected = image_files[index]
@@ -940,45 +940,45 @@ class RandomComposerScript(scripts.Script):
             return []
         with gr.Accordion("🎲 Smart Img2Img Composer", open=False, elem_id="smart_composer_accordion"):
             gr.Markdown(
-                "**有効化 → Generate で自動実行。** 設定は「Smart Img2Img Composer」タブで保存。"
+                "**Check Enable → Click Generate.** Settings are saved in 'Smart Img2Img Composer' tab."
             )
             enabled = gr.Checkbox(
-                label="✅ 有効化（生成時に自動で画像＋プロンプト投入）",
+                label="✅ Enable (Auto-inject image & prompt)",
                 value=False,
                 elem_id="smart_composer_enabled",
             )
             selection_mode = gr.Radio(
-                label="🖼️ 画像の選択モード",
-                choices=["ランダムに選ぶ", "フォルダ内の順番通りに1枚ずつ選ぶ"],
-                value="ランダムに選ぶ",
+                label="🖼️ Image Selection Mode",
+                choices=["Random", "Sequential (One by one in alphabetical order)"],
+                value="Random",
                 elem_id="smart_composer_selection_mode",
             )
             override_prompt = gr.Checkbox(
-                label="プロンプトを上書き（OFFなら既存の末尾に追加）",
+                label="Overwrite Prompt (If OFF, append to existing)",
                 value=True,
                 elem_id="smart_composer_override",
             )
             resize_mode = gr.Dropdown(
-                label="📐 画像サイズ自動調整モード",
+                label="📐 Auto-Resize Mode",
                 choices=[
-                    "変更しない (WebUIのサイズを使用)",
-                    "▼ スライダー設定値に長辺を強制する",
-                    "▼ 元サイズ維持: 512〜1024 の範囲に収める (SD1.5)",
-                    "▼ 元サイズ維持: 1024〜1536 の範囲に収める (SDXL)",
-                    "▼ 元サイズ維持: 1536〜1792 の範囲に収める (高画質)",
+                    "Do not resize (Use WebUI size)",
+                    "▼ Force long edge to slider value",
+                    "▼ Smart Resize: 512~1024 (SD1.5)",
+                    "▼ Smart Resize: 1024~1536 (SDXL)",
+                    "▼ Smart Resize: 1536~1792 (High-Res)",
                 ],
-                value="変更しない (WebUIのサイズを使用)",
+                value="Do not resize (Use WebUI size)",
                 elem_id="smart_composer_resize_mode",
             )
             base_resolution = gr.Slider(
-                label="📏 ベース解像度（「長辺を強制する」モード時のみ有効）",
+                label="📏 Base Resolution (Only valid for 'Force long edge')",
                 minimum=512, maximum=2048, step=64,
                 value=1024,
                 elem_id="smart_composer_base_resolution",
             )
         return [enabled, override_prompt, resize_mode, base_resolution, selection_mode]
 
-    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="変更しない (WebUIのサイズを使用)", base_resolution=1024, selection_mode="ランダムに選ぶ"):
+    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="Do not resize (Use WebUI size)", base_resolution=1024, selection_mode="Random"):
         """before_process のみでプロンプト注入を行う（二重実行防止）"""
         if not enabled:
             return
@@ -1001,18 +1001,18 @@ class RandomComposerScript(scripts.Script):
                 p.init_images = [img]
                 
                 # 画像サイズ自動調整
-                if resize_mode and resize_mode != "変更しない (WebUIのサイズを使用)":
+                if resize_mode and "Do not resize" not in resize_mode:
                     mode_flag = "slider"
                     min_v, max_v = 1024, 1536
                     s_val = int(base_resolution) if base_resolution else 1024
                     
-                    if "512〜1024" in resize_mode:
+                    if "512~1024" in resize_mode:
                         mode_flag = "range"
                         min_v, max_v = 512, 1024
-                    elif "1024〜1536" in resize_mode:
+                    elif "1024~1536" in resize_mode:
                         mode_flag = "range"
                         min_v, max_v = 1024, 1536
-                    elif "1536〜1792" in resize_mode:
+                    elif "1536~1792" in resize_mode:
                         mode_flag = "range"
                         min_v, max_v = 1536, 1792
                         
@@ -1054,49 +1054,49 @@ def on_ui_tabs():
         )
 
         # ─── 設定 & プレビュー ───
-        with gr.Tab("⚙️ 設定 & プレビュー"):
+        with gr.Tab("⚙️ Settings & Preview"):
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.Markdown("### ⚙️ 設定")
+                    gr.Markdown("### ⚙️ Settings")
                     image_folder = gr.Textbox(
-                        label="📁 画像フォルダ",
-                        placeholder="例: C:/images/input",
+                        label="📁 Image Folder",
+                        placeholder="ex: C:/images/input",
                         value=lambda: load_config().get("image_folder", ""),
                     )
                     memo_file = gr.Textbox(
-                        label="📄 メモファイル",
-                        placeholder="例: C:/images/memo.txt",
+                        label="📄 Memo File",
+                        placeholder="ex: C:/images/memo.txt",
                         value=lambda: load_config().get("memo_file", ""),
                     )
                     match_threshold = gr.Slider(
-                        label="🎯 一致率",
+                        label="🎯 Match Threshold (0.0=Exact, 0.4=Loose)",
                         minimum=0.0, maximum=1.0, step=0.05,
                         value=lambda: load_config().get("match_threshold", 0.3),
                     )
                     generation_count = gr.Slider(
-                        label="🔄 生成回数",
+                        label="🔄 Generation Count (Internal Batch)",
                         minimum=1, maximum=100, step=1,
                         value=lambda: load_config().get("generation_count", 1),
                     )
                     fallback_enabled = gr.Checkbox(
-                        label="☑ fallback enabled",
+                        label="☑ Fallback Enabled (Use [default] if not matched)",
                         value=lambda: load_config().get("fallback_enabled", True),
                     )
                     auto_lora_enabled = gr.Checkbox(
-                        label="☑ auto LoRA injection enabled",
+                        label="☑ Auto LoRA Injection Enabled",
                         value=lambda: load_config().get("auto_lora_enabled", True),
                     )
                     with gr.Row():
-                        save_btn = gr.Button("💾 保存", variant="primary")
-                        preview_btn = gr.Button("👁️ プレビュー", variant="secondary")
-                    save_status = gr.Textbox(label="ステータス", interactive=False, max_lines=1)
+                        save_btn = gr.Button("💾 Save", variant="primary")
+                        preview_btn = gr.Button("👁️ Preview", variant="secondary")
+                    save_status = gr.Textbox(label="Status", interactive=False, max_lines=1)
 
                 with gr.Column(scale=1):
-                    gr.Markdown("### 👁️ プレビュー結果")
-                    preview_image = gr.Image(label="選択画像", type="pil", interactive=False)
-                    preview_positive = gr.Textbox(label="📝 Positive", interactive=False, lines=3)
-                    preview_negative = gr.Textbox(label="🚫 Negative", interactive=False, lines=2)
-                    preview_log = gr.Textbox(label="ログ", interactive=False, lines=6)
+                    gr.Markdown("### 👁️ Preview Results")
+                    preview_image = gr.Image(label="Selected Image", type="pil", interactive=False)
+                    preview_positive = gr.Textbox(label="📝 Positive Prompt", interactive=False, lines=3)
+                    preview_negative = gr.Textbox(label="🚫 Negative Prompt", interactive=False, lines=2)
+                    preview_log = gr.Textbox(label="Log", interactive=False, lines=6)
 
             save_btn.click(
                 fn=save_settings,
@@ -1110,44 +1110,44 @@ def on_ui_tabs():
             )
 
         # ─── プロンプト自動生成 ───
-        with gr.Tab("🏷️ プロンプト自動生成"):
+        with gr.Tab("🏷️ Auto-Prompt Gen"):
             gr.Markdown(
-                "### 🏷️ WD14 Tagger で自動プロンプト生成\n"
-                "画像をアップロード → シーン/ポーズ/構図のタグだけ抽出 → メモファイルに追記\n\n"
-                "**服装・人物特徴は自動除外されます。**"
+                "### 🏷️ Auto generate prompts with WD14 Tagger\n"
+                "Upload image → Extract scene/pose/composition tags ONLY → Append to memo file\n\n"
+                "**(Character traits and clothes are automatically EXCLUDED)**"
             )
 
             with gr.Row():
                 with gr.Column(scale=1):
                     gen_image = gr.Image(
-                        label="📸 解析する画像",
+                        label="📸 Target Image",
                         type="pil",
                         interactive=True,
                     )
                     gen_section = gr.Textbox(
-                        label="📌 セクション名",
-                        placeholder="例: タイトル1",
-                        info="メモファイルの [セクション名] になる",
+                        label="📌 Section Name",
+                        placeholder="ex: title1",
+                        info="Becomes [section_name] in memo file",
                     )
                     # --- アコーディオン化されたタグカテゴリ ---
                     _cat_base = ["構図・カメラ", "ポーズ・アクション", "背景・場所", "自然・天候", "照明", "雰囲気", "メタタグ"]
                     _cat_char = ["人物・基本属性", "髪型・顔周り", "表情・口", "服装・靴・装飾品"]
                     _cat_nsfw = ["🎭 行為・アクション", "🦑 クリーチャー・追加キャラ", "🧸 アイテム・玩具", "🔞 特殊構図・フォーカス", "💦 体液・汚れ系", "🥵 表情・フェティッシュ状態", "👗 衣服の乱れ・着脱", "🍆 局所・モザイク"]
                     
-                    gr.Markdown("### 🏷️ 抽出するタグの種類（チェックした種類のタグだけを抽出します）")
-                    with gr.Accordion("🖼️ 基本カテゴリ (構図・背景など)", open=True):
+                    gr.Markdown("### 🏷️ Target Categories (Only checked types extracted)")
+                    with gr.Accordion("🖼️ Base (Composition, Backgrounds)", open=True):
                         gen_cat_base = gr.CheckboxGroup(
                             choices=_cat_base,
                             value=lambda: [c for c in load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())) if c in _cat_base],
                             show_label=False
                         )
-                    with gr.Accordion("👩 人物・詳細カテゴリ (髪型・服装など)", open=False):
+                    with gr.Accordion("👩 Character Detail (Hair, Clothes)", open=False):
                         gen_cat_char = gr.CheckboxGroup(
                             choices=_cat_char,
                             value=lambda: [c for c in load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())) if c in _cat_char],
                             show_label=False
                         )
-                    with gr.Accordion("🔞 特殊・NSFWカテゴリ (行為・アイテム等)", open=False):
+                    with gr.Accordion("🔞 NSFW & Fetish (Actions, Fluids)", open=False):
                         gen_cat_nsfw = gr.CheckboxGroup(
                             choices=_cat_nsfw,
                             value=lambda: [c for c in load_config().get("gen_categories", list(_TAG_CATEGORIES.keys())) if c in _cat_nsfw],
@@ -1155,35 +1155,35 @@ def on_ui_tabs():
                         )
                     # --------------------------------------
                     gen_confidence = gr.Slider(
-                        label="🎯 タグ信頼度しきい値",
+                        label="🎯 Tag Confidence Threshold",
                         minimum=0.1, maximum=0.9, step=0.05,
                         value=lambda: load_config().get("gen_confidence", 0.35),
-                        info="低いほど多くのタグが含まれる",
+                        info="Lower = more tags",
                     )
                     gen_positive = gr.Textbox(
-                        label="✨ デフォルトポジティブ",
+                        label="✨ Default Positive",
                         value=lambda: load_config().get("gen_positive", "(masterpiece:1.1), (best quality:1.0), "),
                         lines=2,
-                        info="抽出されたタグの先頭に自動で付与されるベースプロンプト",
+                        info="Prepended to output",
                     )
                     gen_custom_dict = gr.Textbox(
-                        label="📚 好みのプロンプト置き場（条件付与）",
+                        label="📚 Custom Dictionary",
                         value=lambda: load_config().get("gen_custom_dict", "night, city > cyberpunk cityscape, neon lights, highly detailed, vivid colors\n1girl, smile > beautiful detailed eyes, glowing smile"),
                         lines=3,
-                        info="「条件タグ > 追加したいプロンプト」の形式で記述 (複数行可)。画像から条件タグが出た時のみ追加されます。",
+                        info="Format: `condition tag > prompt to add` (Added only if condition matched in image)",
                     )
                     gen_negative = gr.Textbox(
-                        label="🚫 デフォルトネガティブ",
+                        label="🚫 Default Negative",
                         value=lambda: load_config().get("gen_negative", "lowres, blurry, artifact, bad anatomy, worst quality, low quality, jpeg artifacts"),
                         lines=2,
-                        info="自動生成時に追加するネガティブプロンプト",
+                        info="Appended to output",
                     )
                     with gr.Row():
-                        gen_btn = gr.Button("🏷️ タグ解析＆生成", variant="primary")
-                        send_to_img2img_btn = gr.Button("🚀 img2imgに送る", variant="primary")
+                        gen_btn = gr.Button("🏷️ Generate Tags", variant="primary")
+                        send_to_img2img_btn = gr.Button("🚀 Send to img2img", variant="primary")
                     with gr.Row():
-                        append_btn = gr.Button("📝 メモファイルに追記", variant="secondary")
-                        gen_save_btn = gr.Button("💾 設定を保存", variant="secondary")
+                        append_btn = gr.Button("📝 Append to Memo", variant="secondary")
+                        gen_save_btn = gr.Button("💾 Save Settings", variant="secondary")
 
                 try:
                     from modules import generation_parameters_copypaste as params_copypaste
@@ -1197,19 +1197,19 @@ def on_ui_tabs():
 
                 with gr.Column(scale=1):
                     gen_output = gr.Textbox(
-                        label="✨ 生成されたメモエントリ",
+                        label="✨ Generated Memo Entry",
                         interactive=True,
                         lines=10,
-                        info="編集してからメモファイルに追記できます(不要なタグがあればここで削除)",
+                        info="Edit before appending (remove unwanted tags)",
                     )
                     gen_log = gr.Textbox(
-                        label="解析ログ",
+                        label="Analysis Log",
                         interactive=False,
                         lines=8,
                     )
                     with gr.Row():
                         append_status = gr.Textbox(
-                            label="追記ステータス",
+                            label="Append Status",
                             interactive=False,
                             max_lines=1,
                         )
