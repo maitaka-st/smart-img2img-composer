@@ -14,7 +14,7 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 ![Workflow Diagram](docs/images/workflow_diagram.png)
 
 ## ✨ Features
-- **Random image selection**: Randomly picks an image from your specified input folder for img2img.
+- **Flexible image selection**: Automatically picks an image from your specified input folder for img2img. Supports both "Random" selection and "Sequential" selection (one by one in alphabetical order, retaining index progress across reloads).
 - **Filename-based prompt matching**: Matches the filename (either exact or partial match based on threshold) to a prompt block in your memo file.
 - **Auto-resize dimension optimization**: Automatically scales images while maintaining aspect ratio, with a customizable base resolution slider (512px - 2048px) depending on your model (e.g., SD1.5 or SDXL/Illustrious).
 - **positive / negative prompt support**: Supports writing distinct positive and negative prompts in the memo file.
