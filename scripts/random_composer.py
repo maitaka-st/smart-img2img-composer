@@ -922,17 +922,9 @@ class RandomComposerScript(scripts.Script):
         return [enabled, override_prompt]
 
     def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
-        self._run_composer(p, enabled, override_prompt)
-
-    def process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
-        self._run_composer(p, enabled, override_prompt)
-
-    def _run_composer(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
+        """before_process のみでプロンプト注入を行う（二重実行防止）"""
         if not enabled:
             return
-        if getattr(p, "_smart_composer_ran", False):
-            return
-        p._smart_composer_ran = True
 
         config = load_config()
         selected, positive, negative, log = compose_prompt(
