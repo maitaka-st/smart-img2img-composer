@@ -757,16 +757,17 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
 # プロンプト自動生成
 # ======================================================================
 
-def get_stable_dimensions(img):
+def get_stable_dimensions(img, base_size=1024):
+    """画像のアスペクト比を維持しつつ、指定ベースサイズに合わせた解像度を返す"""
     if not img:
-        return 512, 512
+        return base_size, base_size
     w, h = img.size
     aspect = w / h
     if w > h:
-        new_w = 1024
+        new_w = base_size
         new_h = int(new_w / aspect)
     else:
-        new_h = 1024
+        new_h = base_size
         new_w = int(new_h * aspect)
     # SDで安定しやすいよう64の倍数にスナップ
     new_w = max(64, round(new_w / 64) * 64)
@@ -924,9 +925,20 @@ class RandomComposerScript(scripts.Script):
                 value=True,
                 elem_id="smart_composer_override",
             )
-        return [enabled, override_prompt]
+            auto_resize = gr.Checkbox(
+                label="📐 画像サイズ自動調整（画像に合わせて解像度を変更）",
+                value=False,
+                elem_id="smart_composer_auto_resize",
+            )
+            base_resolution = gr.Radio(
+                label="ベース解像度",
+                choices=["1024 (SDXL / Illustrious)", "768", "512 (SD1.5)"],
+                value="1024 (SDXL / Illustrious)",
+                elem_id="smart_composer_base_resolution",
+            )
+        return [enabled, override_prompt, auto_resize, base_resolution]
 
-    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt):
+    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, auto_resize=False, base_resolution="1024 (SDXL / Illustrious)"):
         """before_process のみでプロンプト注入を行う（二重実行防止）"""
         if not enabled:
             return
@@ -946,8 +958,13 @@ class RandomComposerScript(scripts.Script):
             try:
                 img = Image.open(selected).convert("RGB")
                 p.init_images = [img]
-                # 解像度はユーザーのUI設定をそのまま使用
-                # （SD1.5で1024px等に強制すると顔や目が崩れるため）
+                # 画像サイズ自動調整が有効な場合のみ解像度を変更
+                if auto_resize:
+                    # ベース解像度の数値を抽出
+                    base_size = int(base_resolution.split()[0]) if base_resolution else 1024
+                    new_w, new_h = get_stable_dimensions(img, base_size)
+                    p.width = new_w
+                    p.height = new_h
             except Exception as e:
                 print(f"[Smart Img2Img Composer] 画像読み込み失敗: {e}")
 
