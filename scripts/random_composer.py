@@ -209,7 +209,7 @@ def check_lora_exists(lora_str: str) -> bool:
         pass
     return True
 
-def compose_prompt(image_folder: str, memo_file: str, match_threshold: float) -> tuple:
+def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, selection_mode="ランダムに選ぶ") -> tuple:
     """戻り値: (画像パス, positive, negative, ログ)"""
     log = []
     config = load_config()
@@ -220,8 +220,16 @@ def compose_prompt(image_folder: str, memo_file: str, match_threshold: float) ->
     if not image_files:
         return None, "", "", "❌ 画像フォルダに画像がありません"
 
-    selected = random.choice(image_files)
-    log.append(f"🎲 選択画像: {os.path.basename(selected)}")
+    if "順番" in selection_mode:
+        last_index = config.get("last_sequential_index", 0)
+        index = last_index % len(image_files)
+        selected = image_files[index]
+        config["last_sequential_index"] = index + 1
+        save_config(config)
+        log.append(f"⬇️ 選択画像 (順番 {index+1}/{len(image_files)}): {os.path.basename(selected)}")
+    else:
+        selected = random.choice(image_files)
+        log.append(f"🎲 選択画像 (ランダム): {os.path.basename(selected)}")
 
     sections = parse_memo_file(memo_file)
     if not sections:
@@ -935,9 +943,15 @@ class RandomComposerScript(scripts.Script):
                 "**有効化 → Generate で自動実行。** 設定は「Smart Img2Img Composer」タブで保存。"
             )
             enabled = gr.Checkbox(
-                label="✅ 有効化（生成時にランダム画像＋プロンプト自動投入）",
+                label="✅ 有効化（生成時に自動で画像＋プロンプト投入）",
                 value=False,
                 elem_id="smart_composer_enabled",
+            )
+            selection_mode = gr.Radio(
+                label="🖼️ 画像の選択モード",
+                choices=["ランダムに選ぶ", "フォルダ内の順番通りに1枚ずつ選ぶ"],
+                value="ランダムに選ぶ",
+                elem_id="smart_composer_selection_mode",
             )
             override_prompt = gr.Checkbox(
                 label="プロンプトを上書き（OFFなら既存の末尾に追加）",
@@ -962,9 +976,9 @@ class RandomComposerScript(scripts.Script):
                 value=1024,
                 elem_id="smart_composer_base_resolution",
             )
-        return [enabled, override_prompt, resize_mode, base_resolution]
+        return [enabled, override_prompt, resize_mode, base_resolution, selection_mode]
 
-    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="変更しない (WebUIのサイズを使用)", base_resolution=1024):
+    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="変更しない (WebUIのサイズを使用)", base_resolution=1024, selection_mode="ランダムに選ぶ"):
         """before_process のみでプロンプト注入を行う（二重実行防止）"""
         if not enabled:
             return
@@ -974,6 +988,7 @@ class RandomComposerScript(scripts.Script):
             config.get("image_folder", ""),
             config.get("memo_file", ""),
             config.get("match_threshold", 0.3),
+            selection_mode
         )
 
         generation_count = config.get("generation_count", 1)
