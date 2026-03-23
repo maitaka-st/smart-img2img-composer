@@ -1,14 +1,14 @@
 # 🎲 Smart Img2Img Composer
 
-![Smart Img2Img Composer バナー](docs/images/hero_banner.png)
+![Smart Img2Img Composer バナー](docs/images/hero_banner_ja.png)
 
 AUTOMATIC1111 Stable Diffusion WebUI 用拡張機能。ランダムに画像を選び、関連するプロンプトを自動取得して img2img を実行します。
 
-![機能一覧](docs/images/feature_overview.png)
+![機能一覧](docs/images/feature_overview_ja.png)
 
 ### 動作の仕組み
 
-![ワークフロー](docs/images/workflow_diagram.png)
+![ワークフロー](docs/images/workflow_diagram_ja.png)
 
 ## 🌟 主な機能
 
