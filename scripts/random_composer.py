@@ -757,18 +757,35 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
 # プロンプト自動生成
 # ======================================================================
 
-def get_stable_dimensions(img, base_size=1024):
-    """画像のアスペクト比を維持しつつ、指定ベースサイズに合わせた解像度を返す"""
+def get_stable_dimensions(img, mode="slider", slider_val=1024, min_val=1024, max_val=1536):
+    """画像のアスペクト比を維持しつつ、指定されたモードと範囲に合わせて解像度を返す"""
     if not img:
-        return base_size, base_size
+        return slider_val, slider_val
     w, h = img.size
     aspect = w / h
-    if w > h:
-        new_w = base_size
-        new_h = int(new_w / aspect)
-    else:
-        new_h = base_size
-        new_w = int(new_h * aspect)
+    
+    new_w, new_h = w, h
+    max_edge = max(w, h)
+
+    if mode == "slider":
+        # スライダーの値に長辺を強制
+        if w > h:
+            new_w = slider_val
+            new_h = int(new_w / aspect)
+        else:
+            new_h = slider_val
+            new_w = int(new_h * aspect)
+    elif mode == "range":
+        # 指定範囲内に長辺を収める
+        if max_edge < min_val:
+            scale = min_val / max_edge
+            new_w = w * scale
+            new_h = h * scale
+        elif max_edge > max_val:
+            scale = max_val / max_edge
+            new_w = w * scale
+            new_h = h * scale
+
     # SDで安定しやすいよう64の倍数にスナップ
     new_w = max(64, round(new_w / 64) * 64)
     new_h = max(64, round(new_h / 64) * 64)
@@ -925,21 +942,27 @@ class RandomComposerScript(scripts.Script):
                 value=True,
                 elem_id="smart_composer_override",
             )
-            auto_resize = gr.Checkbox(
-                label="📐 画像サイズ自動調整（画像に合わせて解像度を変更）",
-                value=False,
-                elem_id="smart_composer_auto_resize",
+            resize_mode = gr.Dropdown(
+                label="📐 画像サイズ自動調整モード",
+                choices=[
+                    "変更しない (WebUIのサイズを使用)",
+                    "▼ スライダー設定値に長辺を強制する",
+                    "▼ 元サイズ維持: 512〜1024 の範囲に収める (SD1.5)",
+                    "▼ 元サイズ維持: 1024〜1536 の範囲に収める (SDXL)",
+                    "▼ 元サイズ維持: 1536〜1792 の範囲に収める (高画質)",
+                ],
+                value="変更しない (WebUIのサイズを使用)",
+                elem_id="smart_composer_resize_mode",
             )
             base_resolution = gr.Slider(
-                label="📏 ベース解像度（長辺をこの値に合わせる）",
+                label="📏 ベース解像度（「長辺を強制する」モード時のみ有効）",
                 minimum=512, maximum=2048, step=64,
                 value=1024,
                 elem_id="smart_composer_base_resolution",
-                info="SDXL / Illustrious: 1024〜1536 推奨 ／ SD1.5: 512 推奨",
             )
-        return [enabled, override_prompt, auto_resize, base_resolution]
+        return [enabled, override_prompt, resize_mode, base_resolution]
 
-    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, auto_resize=False, base_resolution=1024):
+    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="変更しない (WebUIのサイズを使用)", base_resolution=1024):
         """before_process のみでプロンプト注入を行う（二重実行防止）"""
         if not enabled:
             return
@@ -959,11 +982,24 @@ class RandomComposerScript(scripts.Script):
             try:
                 img = Image.open(selected).convert("RGB")
                 p.init_images = [img]
-                # 画像サイズ自動調整が有効な場合のみ解像度を変更
-                if auto_resize:
-                    # ベース解像度の数値を抽出
-                    base_size = int(base_resolution) if base_resolution else 1024
-                    new_w, new_h = get_stable_dimensions(img, base_size)
+                
+                # 画像サイズ自動調整
+                if resize_mode and resize_mode != "変更しない (WebUIのサイズを使用)":
+                    mode_flag = "slider"
+                    min_v, max_v = 1024, 1536
+                    s_val = int(base_resolution) if base_resolution else 1024
+                    
+                    if "512〜1024" in resize_mode:
+                        mode_flag = "range"
+                        min_v, max_v = 512, 1024
+                    elif "1024〜1536" in resize_mode:
+                        mode_flag = "range"
+                        min_v, max_v = 1024, 1536
+                    elif "1536〜1792" in resize_mode:
+                        mode_flag = "range"
+                        min_v, max_v = 1536, 1792
+                        
+                    new_w, new_h = get_stable_dimensions(img, mode_flag, s_val, min_v, max_v)
                     p.width = new_w
                     p.height = new_h
             except Exception as e:
