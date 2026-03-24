@@ -56,8 +56,8 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
 _I18N = {
     # --- img2img アコーディオン ---
     "accordion_desc": {
-        "en": "**Check Enable → Click Generate.** Settings are saved in 'Smart Img2Img Composer' tab.",
-        "ja": "**有効化 → Generate で自動実行。** 設定は「Smart Img2Img Composer」タブで保存。",
+        "en": "**Check Enable → Click Generate.** (Tip: If using external wildcards in the main box, turn OFF 'Overwrite Prompt' below).",
+        "ja": "**有効化 → Generate で自動実行。** (Tip: 外部のワイルドカード等と併用する場合は下の「プロンプトを上書き」をOFFにしてください)。",
     },
     "enable": {
         "en": "✅ Enable (Auto-inject image & prompt)",
@@ -327,10 +327,10 @@ _I18N = {
     "log_no_match": {"en": "⚠️ No matching section found", "ja": "⚠️ 一致するセクションが見つかりませんでした"},
     "log_random_lora": {"en": "🎲 Random LoRA applied: {lora}", "ja": "🎲 ランダムLoRA適用: {lora}"},
     "log_match_count": {"en": "✅ Matched sections: {count}", "ja": "✅ 一致セクション数: {count}"},
-    "tab_lora_manager": {"en": "🏷️ LoRA Manager", "ja": "🏷️ LoRAマネージャー"},
+    "tab_lora_manager": {"en": "🏷️ Prompt & LoRA Manager", "ja": "🏷️ プロンプト&LoRAマネージャー"},
     "lora_manager_desc": {
-        "en": "Register and manage your Character/Situation LoRAs. You can also edit the .txt files directly.",
-        "ja": "キャラクターやシチュエーションのLoRAリストを管理します。拡張機能内の.txtファイルを直接編集することも可能です。"
+        "en": "Manage lists for random prompts or LoRAs. Each line is picked randomly. You can also put wildcards like `__color__` here.",
+        "ja": "ランダムに選ばれるプロンプトやLoRAのリストを管理します。1行につき1項目がランダムに選ばれます。`__color__`等のワイルドカードも記述可能です。"
     },
     "lora_type": {"en": "LoRA Category", "ja": "LoRAカテゴリ"},
     "lora_type_char": {"en": "Character", "ja": "キャラクター"},
