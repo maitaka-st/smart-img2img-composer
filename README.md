@@ -18,12 +18,17 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 - **Filename-based prompt matching**: Matches the filename (either exact or partial match based on threshold) to a prompt block in your memo file.
 - **Auto-resize dimension optimization**: Automatically scales images while maintaining aspect ratio, with a customizable base resolution slider (512px - 2048px) depending on your model (e.g., SD1.5 or SDXL/Illustrious).
 - **positive / negative prompt support**: Supports writing distinct positive and negative prompts in the memo file.
-- **WD14 Tagger integration**: Built-in tab to auto-generate prompts from your reference images using WD14 Tagger, with smart category filtering.
-- **conditional prompt injection system**: define custom dictionary rules to automatically inject stylistic tags when certain trigger words are found.
-- **fallback prompt support**: Automatically falls back to a `[default]` section if the image name doesn't match any specific block.
-- **automatic LoRA injection support**: Configure `lora:` blocks in your memo file, which automatically injects `<lora:name:weight>` only if the LoRA is actually installed.
+- **WD14 Tagger integration**: Built-in tab to auto-generate prompts from reference images using WD14 Tagger, with smart category filtering.
+- **Conditional prompt injection system**: Define custom dictionary rules to automatically inject stylistic tags when certain trigger words are found.
+- **Fallback prompt support**: Automatically falls back to a `[default]` section if the image name doesn't match any specific block.
+- **Automatic LoRA injection support**: Configure `lora:` blocks in your memo file, which automatically injects `<lora:name:weight>` only if the LoRA is actually installed.
+- **Preset Management (v2.4.0)**: Save and load multiple configurations (folders, thresholds, etc.) to quickly switch between different workflows.
+- **LoRA Weight Global Offset (v2.4.1)**: Fine-tune all LoRA weights in a preset at once with a single slider.
+- **Automatic Output Sorting (v2.4.1)**: Automatically sort generated images into subfolders by Preset Name, Section Name, or Date.
 - **Complete Internationalization (i18n)**: All UI elements support English and Japanese.
-- **Auto-Prompt Generation (WD14 Tagger Integration)**: Analyze images and generate prompts automatically.
+- **v2.4.2**: **Refined Health Check** (localized ✅/❌ icons), **UI Stability Fixes** (Gradio crash fix), and updated manual.
+- **v2.4.1**: **LoRA Global Offset**, **Output Sorting**, and bug fixes for folder paths.
+- **v2.4.0**: **Preset System** (Save/Load configurations) and UI/UX overhaul.
 - **v2.3.2**: **Path Quoting Support** (`strip('"')`) and **Debug Logging** for prompt loading.
 - **v2.3.1**: Hotfix for `get_random_asset` and manager connectivity.
 - **v2.3.0**: **Custom Wildcard Paths** (flexible asset files) and **UI nesting** (nested accordion).
