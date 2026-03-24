@@ -26,11 +26,11 @@ from modules import script_callbacks, processing, scripts
 EXTENSION_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(EXTENSION_DIR, "config.json")
-LORA_CHAR_PATH = os.path.join(BASE_DIR, "lora_char.txt")
-LORA_SIT_PATH = os.path.join(BASE_DIR, "lora_sit.txt")
-WILD_1_PATH = os.path.join(BASE_DIR, "wildcard_1.txt")
-WILD_2_PATH = os.path.join(BASE_DIR, "wildcard_2.txt")
-WILD_3_PATH = os.path.join(BASE_DIR, "wildcard_3.txt")
+LORA_CHAR_PATH = os.path.join(EXTENSION_DIR, "lora_char.txt")
+LORA_SIT_PATH = os.path.join(EXTENSION_DIR, "lora_sit.txt")
+WILD_1_PATH = os.path.join(EXTENSION_DIR, "wildcard_1.txt")
+WILD_2_PATH = os.path.join(EXTENSION_DIR, "wildcard_2.txt")
+WILD_3_PATH = os.path.join(EXTENSION_DIR, "wildcard_3.txt")
 
 DEFAULT_CONFIG = {
     "image_folder": "",
@@ -435,12 +435,18 @@ _I18N = {
 }
 
 
+_lang_cache = None
+
 def _get_lang() -> str:
     """config.jsonからlanguage設定を読み取る (デフォルト: ja)"""
+    global _lang_cache
+    if _lang_cache is not None:
+        return _lang_cache
     try:
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f).get("language", "ja")
+                _lang_cache = json.load(f).get("language", "ja")
+                return _lang_cache
     except Exception:
         pass
     return "ja"
@@ -468,10 +474,15 @@ def load_config() -> dict:
 
 
 def save_config(config: dict) -> str:
+    """設定をconfig.jsonに保存し、キャッシュをクリアする"""
+    global _lang_cache
     try:
-        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+        dir_path = os.path.dirname(CONFIG_PATH)
+        if dir_path:
+            os.makedirs(dir_path, exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
+            json.dump(config, f, indent=4, ensure_ascii=False)
+        _lang_cache = None # キャッシュをクリア
         return t("msg_settings_saved")
     except IOError as e:
         return f"{t('msg_settings_err')} {e}"
@@ -573,58 +584,53 @@ def get_image_files(folder: str) -> list:
 
 
 def match_image_to_sections(image_path: str, sections: dict, threshold: float) -> list:
-    basename = os.path.splitext(os.path.basename(image_path))[0].lower()
-    exact_match = []
-    partial_match_candidates = []
+    """difflib.SequenceMatcherを使用して、ファイル名に最も類似したプロンプトセクションを特定する"""
+    if not image_path or not sections:
+        return []
 
-    for section_name, data in sections.items():
-        # 完全一致（最優先）
-        if basename == section_name:
-            exact_match.append(data)
+    from difflib import SequenceMatcher
+    filename = os.path.splitext(os.path.basename(image_path))[0].lower()
+    
+    best_matches = []
+    max_score = 0
+    
+    for section in sections.keys():
+        if section.lower() == "default":
             continue
-            
-        # 部分一致のスコア計算
-        score = 0
-        if section_name in basename or basename in section_name:
-            shorter = min(len(basename), len(section_name))
-            longer = max(len(basename), len(section_name))
-            if shorter >= 3 and longer > 0:
-                score = shorter / longer
         
-        # 類似度マッチ（閾値以下の場合のみ試行してスコアを更新）
-        if score < 1.0 and threshold < 1.0:
-            longer = max(len(basename), len(section_name))
-            if longer > 0:
-                common = sum(1 for a, b in zip(basename, section_name) if a == b)
-                sim_score = common / longer
-                if sim_score > score:
-                    score = sim_score
+        # 類似度スコア (0.0 - 1.0)
+        score = SequenceMatcher(None, filename, section.lower()).ratio()
         
         if score >= threshold:
-            partial_match_candidates.append((score, data))
-
-    # 完全一致があれば完全一致のみ返す
-    if exact_match:
-        return [exact_match[0]] # 複数あっても1件に絞る（通常は辞書なので1件）
+            if score > max_score:
+                max_score = score
+                best_matches = [section]
+            elif score == max_score:
+                best_matches.append(section)
     
-    # 部分一致があれば最もスコアが高い1件のみ返す
-    if partial_match_candidates:
-        partial_match_candidates.sort(key=lambda x: x[0], reverse=True)
-        return [partial_match_candidates[0][1]]
+    if best_matches:
+        # スコア最大のものが1つならそれを、複数なら最初の1つを返す
+        target_section = best_matches[0]
+        return [sections[target_section]]
 
     return []
 
 
 def check_lora_exists(lora_str: str) -> bool:
-    parts = lora_str.split(":")
-    lora_name = parts[0].strip()
+    """Loraが実際にインストールされているか確認する。ImportError時はFalseを返す"""
     try:
-        import modules.lora
-        if hasattr(modules.lora, 'available_loras'):
-            return lora_name in modules.lora.available_loras
-    except ImportError:
-        pass
-    return True
+        from modules import extra_networks
+        # <lora:name:weight> または name:weight から name を抽出
+        raw = lora_str.replace("<", "").replace(">", "")
+        if ":" not in raw:
+            return False
+        parts = raw.split(":")
+        lora_name = parts[1].strip() if parts[0].lower() == "lora" else parts[0].strip()
+        
+        # A1111内部の拡張ネットワークから検索
+        return lora_name in extra_networks.extra_network_registry["lora"].items
+    except (ImportError, KeyError, AttributeError):
+        return False
 
 def _clean_prompt(prompt: str) -> str:
     """カンマ区切りのプロンプトから重複を削除し、クリーニングする"""
@@ -1023,21 +1029,29 @@ _TAG_CATEGORIES = {
 }
 
 
+_compiled_cat_patterns = {}
+
 def _filter_tags(tags: dict, confidence_threshold: float = 0.35, selected_categories=None) -> dict:
-    """許可タグカテゴリに含まれるタグのみ残すフィルタ"""
+    """許可タグカテゴリに含まれるタグのみ残すフィルタ (正規表現をキャッシュ)"""
+    global _compiled_cat_patterns
     if selected_categories is None:
         selected_categories = list(_TAG_CATEGORIES.keys())
 
-    allowed_tags = set()
-    allowed_patterns = []
-    
-    for cat in selected_categories:
-        if cat in _TAG_CATEGORIES:
-            for item in _TAG_CATEGORIES[cat]:
-                if item.startswith("re:"):
-                    allowed_patterns.append(re.compile(item[3:]))
-                else:
-                    allowed_tags.add(item)
+    # カテゴリの組み合わせをキーにしてキャッシュ
+    cache_key = tuple(sorted(selected_categories))
+    if cache_key in _compiled_cat_patterns:
+        allowed_tags, allowed_patterns = _compiled_cat_patterns[cache_key]
+    else:
+        allowed_tags = set()
+        allowed_patterns = []
+        for cat in selected_categories:
+            if cat in _TAG_CATEGORIES:
+                for item in _TAG_CATEGORIES[cat]:
+                    if item.startswith("re:"):
+                        allowed_patterns.append(re.compile(item[3:]))
+                    else:
+                        allowed_tags.add(item)
+        _compiled_cat_patterns[cache_key] = (allowed_tags, allowed_patterns)
 
     filtered = {}
     for tag, score in tags.items():
@@ -1228,10 +1242,10 @@ def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_
     """画像を解析してメモエントリを生成"""
     gen_categories = cat_base + cat_char + cat_nsfw
     if image is None:
-        return "", t("msg_no_upload_err")
+        return "", t("msg_no_upload_err"), "", "", "512", "512"
 
     if not section_name or not section_name.strip():
-        return "", t("msg_no_section_err")
+        return "", t("msg_no_section_err"), "", "", "512", "512"
 
     try:
         section_name = section_name.strip()
@@ -1240,7 +1254,7 @@ def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_
 
         filtered, all_tags, error = _interrogate_image(image, confidence, gen_categories)
         if error:
-            return "", error
+            return "", error, "", "", "512", "512"
 
         log_lines = []
         log_lines.append(t("log_all_tags").format(count=len(all_tags)))
@@ -1586,7 +1600,7 @@ def on_ui_tabs():
 
     with gr.Blocks(analytics_enabled=False) as tab:
         gr.Markdown(
-            "# 🎲 Smart Img2Img Composer (v2.2.0)\n"
+            "# 🎲 Smart Img2Img Composer (v2.2.1)\n"
             + t("tab_header")
         )
 
