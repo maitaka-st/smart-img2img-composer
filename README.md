@@ -27,7 +27,8 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 - **Injection Stability (v2.1.2)**: Reliable prompt injection that works with batch generation and various WebUI versions.
 - **Smart Matching**: Selects the single best-matching prompt based on filename similarity score.
 - **Tag Deduplication**: Automatically cleans up redundant tags in the final prompt.
-- **Integrated LoRA Manager (v2.2.2)**: Manage Character and Situation LoRA lists in a dedicated tab. Supports **one-by-one appending** (with automatic newline) and random injection during img2img generation.
+- **Integrated Prompt & LoRA Manager (v2.1.5)**: Register and manage lists of your favorite Character/Situation prompts and LoRAs. Each line is picked randomly, providing a built-in "Wildcard" functionality.
+- **Smart Extension Compatibility**: Runs at high priority (`-100`) to be compatible with other scripts like Dynamic Prompts. (Tip: Turn OFF 'Overwrite Prompt' if you want to use manual wildcards in the main WebUI box).
 - **Consolidated Settings**: All configurations are persisted to `config.json` and persist across browser reloads.
 - **Custom Dictionary**: Map specific tags or WD14 results to your own custom phrases.
 
