@@ -62,5 +62,6 @@
   "✨ Generated Memo Entry": "✨ 生成されたメモエントリ",
   "Edit before appending (remove unwanted tags)": "編集してからメモファイルに追記できます(不要なタグがあればここで削除)",
   "Analysis Log": "解析ログ",
-  "Append Status": "追記ステータス"
+  "Append Status": "追記ステータス",
+  "You have unsaved changes in the LoRA list. Are you sure you want to switch categories?": "LoRAリストに未保存の変更があります。カテゴリーを切り替えてもよろしいですか？"
 }

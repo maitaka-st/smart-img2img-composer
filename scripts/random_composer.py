@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 Random Img2Img Composer
-AUTOMATIC1111 Stable Diffusion WebUI 拡張機能
+AUTOMATIC1111 Stable Diffusion WebUI 拡張機能 v2.4.2 (Stable)
 
 img2img生成時に、指定フォルダからランダム画像を選択し、
 メモファイルから対応プロンプト（positive/negative）を自動取得して投入する。
 WD14 Tagger連携でプロンプトの自動生成も可能。
+
+【v2.4.2 修正内容】
+- UI/UX: ヘルスチェック警告を各パス入力欄のラベル表示に移動（威圧的な赤バーを削除）
+- UI/UX: 「使い方」タブのマニュアルを最新機能に合わせて全面刷新
+- Logic: パスが空欄の場合は「未設定」として扱い、警告を表示しないように調整
+- Cleanup: v2.4.1で行ったLoRAマネージャー未保存警告、デッドコード削除などを統合
 """
 
 import os
@@ -14,6 +20,7 @@ import json
 import random
 import re
 import traceback
+import difflib
 import gradio as gr
 from PIL import Image
 
@@ -23,8 +30,9 @@ from modules import script_callbacks, processing, scripts
 # 定数
 # ======================================================================
 
-EXTENSION_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXTENSION_DIR = os.path.dirname(BASE_DIR)
+
 CONFIG_PATH = os.path.join(EXTENSION_DIR, "config.json")
 LORA_CHAR_PATH = os.path.join(EXTENSION_DIR, "lora_char.txt")
 LORA_SIT_PATH = os.path.join(EXTENSION_DIR, "lora_sit.txt")
@@ -33,6 +41,7 @@ WILD_2_PATH = os.path.join(EXTENSION_DIR, "wildcard_2.txt")
 WILD_3_PATH = os.path.join(EXTENSION_DIR, "wildcard_3.txt")
 
 DEFAULT_CONFIG = {
+    "language": "ja",
     "image_folder": "",
     "memo_file": "",
     "match_threshold": 0.3,
@@ -47,13 +56,17 @@ DEFAULT_CONFIG = {
         "outdoors, wind > flowing hair, dynamic pose, motion blur, cinematic composition\n"
         "street, night > urban photography style, moody shadows, film grain, realistic lighting"
     ),
-    "gen_categories": [], # _TAG_CATEGORIES初期化時に後でセットするか、Noneで扱う
+    "wildcard_1_path": WILD_1_PATH,
+    "wildcard_2_path": WILD_2_PATH,
+    "wildcard_3_path": WILD_3_PATH,
     "fallback_enabled": True,
     "auto_lora_enabled": True,
+    "lora_offset": 0.0,
+    "output_sort_mode": "None",
+    "presets": {},
 }
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
-
 
 # ======================================================================
 # i18n 翻訳辞書
@@ -75,6 +88,9 @@ _I18N = {
     "wildcard_1": {"en": "Wildcard 1", "ja": "ワイルドカード1"},
     "wildcard_2": {"en": "Wildcard 2", "ja": "ワイルドカード2"},
     "wildcard_3": {"en": "Wildcard 3", "ja": "ワイルドカード3"},
+    "accordion_assets": {"en": "🎲 Random Asset Slots", "ja": "🎲 ランダムアセット・スロット"},
+    "tab_settings_wildcards": {"en": "📂 Custom Wildcard Paths", "ja": "📂 カスタム・ワイルドカードのパス設定"},
+    "wildcard_path_label": {"en": "Path to {name}", "ja": "{name}のパス"},
     "selection_mode": {
         "en": "🖼️ Image Selection Mode",
         "ja": "🖼️ 画像の選択モード",
@@ -152,6 +168,10 @@ _I18N = {
         "en": "🎯 Match Threshold (0.0=Exact, 0.4=Loose)",
         "ja": "🎯 一致率 (0.0=完全一致, 0.4=あいまい)",
     },
+    "lora_manager_desc": {
+        "en": "Manage lists for random prompts or LoRAs. Each line is picked randomly.",
+        "ja": "ランダムに選ばれるプロンプトやLoRAのリストを管理します。1行につき1項目がランダムに選ばれます。"
+    },
     "generation_count": {
         "en": "🔄 Generation Count (Internal Batch)",
         "ja": "🔄 生成回数",
@@ -165,8 +185,32 @@ _I18N = {
         "ja": "☑ auto LoRA injection 有効",
     },
     "btn_save": {
-        "en": "💾 Save",
-        "ja": "💾 保存",
+        "en": "💾 Save Settings (Global)",
+        "ja": "💾 グローバル設定を保存",
+    },
+    "btn_save_settings": {
+        "en": "💾 Save Settings",
+        "ja": "💾 設定を保存",
+    },
+    "btn_save_preset": {
+        "en": "💾 Save Preset",
+        "ja": "💾 プリセットを保存",
+    },
+    "btn_delete_preset": {
+        "en": "🗑️ Delete",
+        "ja": "🗑️ 削除",
+    },
+    "preset_label": {
+        "en": "📦 Presets",
+        "ja": "📦 プリセット",
+    },
+    "preset_ph": {
+        "en": "New preset name",
+        "ja": "新規プリセット名",
+    },
+    "lora_offset": {
+        "en": "⚖️ Global LoRA Weight Offset",
+        "ja": "⚖️ LoRA一括ウェイト微調整",
     },
     "btn_preview": {
         "en": "👁️ Preview",
@@ -261,7 +305,6 @@ _I18N = {
         "en": "Format: `condition tag > prompt to add` (Added only if condition matched in image)",
         "ja": "「条件タグ > 追加したいプロンプト」の形式で記述 (複数行可)。画像から条件タグが出た時のみ追加されます。",
     },
-    
     # --- タグカテゴリ名 ---
     "cat_composition": {"en": "Composition & Camera", "ja": "構図・カメラ"},
     "cat_pose": {"en": "Pose & Action", "ja": "ポーズ・アクション"},
@@ -282,7 +325,6 @@ _I18N = {
     "cat_nsfw_fetish": {"en": "🥵 Fetish States", "ja": "🥵 表情・フェティッシュ状態"},
     "cat_nsfw_clothes_mess": {"en": "👗 Clothes Mess", "ja": "👗 衣服の乱れ・着脱"},
     "cat_nsfw_censored": {"en": "🍆 Censor & Genitals", "ja": "🍆 局所・モザイク"},
-
     # --- 関数戻り値メッセージ ---
     "msg_settings_saved": {"en": "✅ Settings saved", "ja": "✅ 設定を保存しました"},
     "msg_settings_err": {"en": "❌ Failed to save settings:", "ja": "❌ 設定の保存に失敗しました:"},
@@ -321,6 +363,42 @@ _I18N = {
         "en": "Append Status",
         "ja": "追記ステータス",
     },
+    "health_check_ok": {
+        "en": "✅ All paths are healthy.",
+        "ja": "✅ すべてのパスが正しく設定されています。",
+    },
+    "health_check_err": {
+        "en": "⚠️ Path Error: {path} not found.",
+        "ja": "⚠️ パスエラー: {path} が見つかりません。",
+    },
+    "health_check_title": {
+        "en": "🔍 Path Health Check",
+        "ja": "🔍 パス設定のヘルスチェック",
+    },
+    "output_settings": {
+        "en": "📂 Output Folder & Sorting Settings",
+        "ja": "📂 出力先・自動フォルダ振り分け設定",
+    },
+    "sort_mode": {
+        "en": "📁 Sorting Mode",
+        "ja": "📁 振り分けモード",
+    },
+    "sort_none": {
+        "en": "None (WebUI Default)",
+        "ja": "なし (WebUIデフォルト)",
+    },
+    "sort_preset": {
+        "en": "By Preset Name",
+        "ja": "プリセット名で分ける",
+    },
+    "sort_section": {
+        "en": "By Matched Section Name",
+        "ja": "一致したセクション名で分ける",
+    },
+    "sort_date": {
+        "en": "By Date (YYYY-MM-DD)",
+        "ja": "日付で分ける (YYYY-MM-DD)",
+    },
     "no_images": {
         "en": "❌ No images found in the folder",
         "ja": "❌ 画像フォルダに画像がありません",
@@ -340,10 +418,6 @@ _I18N = {
     "log_random_lora": {"en": "🎲 Random LoRA applied: {lora}", "ja": "🎲 ランダムLoRA適用: {lora}"},
     "log_match_count": {"en": "✅ Matched sections: {count}", "ja": "✅ 一致セクション数: {count}"},
     "tab_lora_manager": {"en": "🏷️ Prompt & LoRA Manager", "ja": "🏷️ プロンプト&LoRAマネージャー"},
-    "lora_manager_desc": {
-        "en": "Manage lists for random prompts or LoRAs. Each line is picked randomly. You can also put wildcards like `__color__` here.",
-        "ja": "ランダムに選ばれるプロンプトやLoRAのリストを管理します。1行につき1項目がランダムに選ばれます。`__color__`等のワイルドカードも記述可能です。"
-    },
     "lora_type": {"en": "LoRA Category", "ja": "LoRAカテゴリ"},
     "lora_type_char": {"en": "Character", "ja": "キャラクター"},
     "lora_type_sit": {"en": "Situation", "ja": "シチュエーション"},
@@ -360,82 +434,97 @@ _I18N = {
     "log_excluded_tags": {"en": "🗑️ Excluded: {count}", "ja": "🗑️ 除外タグ数: {count}"},
     "log_custom_match": {"en": "🎯 Custom match: [{cond}] => Added: {prompt}", "ja": "🎯 条件マッチ: [{cond}] => 追加: {prompt}"},
     "log_no_pos_prompt": {"en": "⚠️ No valid positive prompt", "ja": "⚠️ 有効なポジティブプロンプトがありません"},
+    # --- Bug Fix: 翻訳キー追加 (generated_entry, analysis_log) ---
+    "generated_entry": {
+        "en": "📋 Generated Entry (editable)",
+        "ja": "📋 生成されたエントリ（編集可能）",
+    },
+    "generated_entry_info": {
+        "en": "Review and edit before appending to memo file",
+        "ja": "メモファイルへ追記する前に確認・編集してください",
+    },
+    "analysis_log": {
+        "en": "Analysis Log",
+        "ja": "解析ログ"
+    },
     # --- 使い方タブ ---
     "tab_usage": {"en": "📖 Usage", "ja": "📖 使い方"},
     "usage_md": {
         "en": (
-            "## How to write Memo File\n"
-            "Create a text file and write in the following format:\n"
+            "## 📖 User Manual (v2.4.2)\n\n"
+            "### 1. Basic Flow\n"
+            "1. Set your **📁 Image Folder** and **📄 Memo File** paths in the Settings tab.\n"
+            "2. In the **img2img** tab, open **🎲 Smart Composer** and check **Enable**.\n"
+            "3. Click **Generate**. The script will pick a random image and its matching prompt from your memo file.\n\n"
+            "### 2. Memo File Format\n"
             "```text\n"
-            "[title1]\n"
-            "positive:\n"
-            "(masterpiece:1.1), 1girl, portrait\n"
-            "\n"
-            "negative:\n"
-            "lowres, blurry, artifact\n"
-            "\n"
-            "[city]\n"
-            "positive:\n"
-            "skyline, sunset, cinematic lighting\n"
-            "\n"
-            "negative:\n"
-            "lowres, text, watermark\n"
-            "```\n\n"
-            "## Rules\n"
-            "- `[name]` = Section start\n"
-            "- Under `positive:` = Positive prompt\n"
-            "- Under `negative:` = Negative prompt\n"
-            "- If `positive:`/`negative:` omitted, entire block is positive\n"
-            "- `#` = Comment / Empty lines = Ignored\n\n"
-            "## Using in img2img\n"
-            "1. Save your folder paths in **⚙️ Settings** tab.\n"
-            "2. In **img2img** tab, expand **🎲 Smart Composer** and check **Enable**.\n"
-            "3. Click **Generate** to start auto-processing.\n\n"
-            "## Auto-Prompt Generation\n"
-            "1. Upload image to **🏷️ Auto-Prompt Gen** tab.\n"
-            "2. Enter section name and click **Generate Tags**.\n"
-            "3. Review/edit and click **Append to Memo**.\n"
-            "4. Requires WD14 Tagger extension."
+            "[beach]\n"
+            "positive: 1girl, swimming, sea, sunset\n"
+            "negative: lowres, blurry\n\n"
+            "[forest]\n"
+            "1girl, standing in woods, trees, bird\n"
+            "```\n"
+            "- `[title]` matches image filenames (e.g. `beach_01.png` matches `[beach]`).\n"
+            "- If `positive:`/`negative:` are missing, the whole block is positive.\n"
+            "- Empty sections will fallback to the `[default]` section.\n\n"
+            "### 3. Advanced Features\n"
+            "- **📦 Presets**: Save all settings (paths, thresholds, etc.) as named presets for quick switching.\n"
+            "- **⚖️ LoRA Weight Adjustment**: Use the slider to offset all LoRA weights in your prompts collectively (e.g., -0.1 to weaken all).\n"
+            "- **📁 Output Sorting**: Automatically organize generated images into subfolders named by Preset, Section, or Date.\n"
+            "- **🔍 Health Check**: Invalid paths will show a ❌ mark on their labels. Empty paths are ignored.\n"
+            "- **🏷️ LoRA Manager**: Manage your character/situation LoRA lists. Unsaved changes trigger a warning dialog.\n"
+            "- **🎲 Asset Slots**: Use multiple folders as random sources by enabling extra slots.\n\n"
+            "### 4. Integration\n"
+            "- **WD14 Tagger**: Use the 'Auto-Prompt Gen' tab to analyze images and append tags to your memo file.\n"
+            "- **Dynamic Prompts**: Supports `__wildcards__` and `{A|B}` syntax within the memo file."
         ),
         "ja": (
-            "## メモファイルの書き方\n"
-            "テキストファイルを作成して以下の形式で書きます：\n"
+            "## 📖 ユーザーマニュアル (v2.4.2)\n\n"
+            "### 1. 基本的な使い方\n"
+            "1. **⚙️ 設定** タブで **📁 画像フォルダ** と **📄 メモファイル** のパスを指定します。\n"
+            "2. **img2img** タブ内の **🎲 Smart Composer** アコーディオンを開き、**有効化** にチェックを入れます。\n"
+            "3. **Generate** をクリックすると、画像とプロンプトが自動的に送り込まれます。\n\n"
+            "### 2. メモファイルの書き方\n"
             "```text\n"
             "[タイトル1]\n"
-            "positive:\n"
-            "(masterpiece:1.1), 1girl, portrait\n"
-            "\n"
-            "negative:\n"
-            "lowres, blurry, artifact\n"
-            "\n"
-            "[city]\n"
-            "positive:\n"
-            "skyline, sunset, cinematic lighting\n"
-            "\n"
-            "negative:\n"
-            "lowres, text, watermark\n"
-            "```\n\n"
-            "## ルール\n"
-            "- `[名前]` = セクション開始\n"
-            "- `positive:` の下 = ポジティブプロンプト\n"
-            "- `negative:` の下 = ネガティブプロンプト\n"
-            "- `positive:` / `negative:` 省略時は全て positive 扱い\n"
-            "- `#` = コメント / 空行 = 無視\n\n"
-            "## img2img での使い方\n"
-            "1. **⚙️ 設定** タブで画像フォルダ・メモファイルを保存\n"
-            "2. **img2img** タブで **🎲 Smart Composer** → **有効化**\n"
-            "3. **Generate** ボタンで自動実行\n\n"
-            "## プロンプト自動生成\n"
-            "1. **🏷️ プロンプト自動生成** タブで画像をアップロード\n"
-            "2. セクション名を入力して **タグ解析＆生成**\n"
-            "3. 結果を確認・編集して **メモファイルに追記**\n"
-            "4. WD14 Tagger 拡張が必要です"
+            "positive: 1girl, 笑顔, 公園\n"
+            "negative: 低品質, ぼけ\n\n"
+            "[タイトル2]\n"
+            "1girl, 立ち姿, 部屋, 夜\n"
+            "```\n"
+            "- `[タイトル]` 部分が画像ファイル名と部分一致（あいまい検索）します。\n"
+            "- `positive:` / `negative:` を省略すると、そのブロック全体がポジティブ扱いになります。\n"
+            "- 内容が空のセクションは、自動的に `[default]` セクションの設定へ飛ばされます。\n\n"
+            "### 3. 便利な機能\n"
+            "- **📦 プリセット**: 各パスや設定値を名前を付けて保存し、一瞬で切り替えられます。\n"
+            "- **⚖️ LoRA一括ウェイト微調整**: プロンプトに含まれる全てのLoRAの重みをスライサーで一律に増減（例：全体的に少し弱める等）できます。\n"
+            "- **📁 自動フォルダ振り分け**: 生成画像を「プリセット名」「セクション名」「日付」ごとのサブフォルダに自動で整理して保存します。\n"
+            "- **🔍 ヘルスチェック**: パスが無効な場合、各入力欄のラベルに ❌ が表示されます。未入力（空欄）の場合は警告されません。\n"
+            "- **🏷️ LoRAマネージャー**: キャラクターやシチュエーションごとのLoRAリストを管理できます。未保存で切り替えようとすると警告が出ます。\n"
+            "- **🎲 アセットスロット**: 複数の画像フォルダをランダムソースとして併用したい場合にスロットを有効化して使用します。\n\n"
+            "### 4. 外部機能連携\n"
+            "- **WD14 Tagger**: 「プロンプト自動生成」タブで画像を解析し、その場でメモファイルへタグを追記できます。\n"
+            "- **Dynamic Prompts**: メモファイル内で `__wildcard__` や `{A|B}` などの構文がそのまま利用可能です。"
         )
+    },
+    # --- UI/UX: LoRAマネージャー未保存警告 ---
+    "lora_unsaved_warning": {
+        "en": "⚠️ Unsaved changes detected. Save before switching?",
+        "ja": "⚠️ 未保存の変更があります。切り替える前に保存しますか？",
+    },
+    "lora_mgr_placeholder": {
+        "en": "Loading...",
+        "ja": "読み込み中...",
     },
 }
 
 
+# ======================================================================
+# 言語キャッシュ管理 (Bug Fix: 二重定義を解消し1か所に統合)
+# ======================================================================
+
 _lang_cache = None
+
 
 def _get_lang() -> str:
     """config.jsonからlanguage設定を読み取る (デフォルト: ja)"""
@@ -452,6 +541,11 @@ def _get_lang() -> str:
     return "ja"
 
 
+def invalidate_lang_cache():
+    global _lang_cache
+    _lang_cache = None
+
+
 def t(key: str) -> str:
     """翻訳キーを現在の言語に変換して返す"""
     lang = _get_lang()
@@ -463,11 +557,22 @@ def t(key: str) -> str:
 # 設定管理
 # ======================================================================
 
+def _clean_path(path: str) -> str:
+    """パスの前後から空白や引用符を削除する"""
+    if not path or not isinstance(path, str):
+        return ""
+    return path.strip().strip('"').strip("'").strip()
+
+
 def load_config() -> dict:
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return {**DEFAULT_CONFIG, **json.load(f)}
+                config = {**DEFAULT_CONFIG, **json.load(f)}
+                for k in ["image_folder", "memo_file", "wildcard_1_path", "wildcard_2_path", "wildcard_3_path"]:
+                    if k in config and isinstance(config[k], str):
+                        config[k] = _clean_path(config[k])
+                return config
         except (json.JSONDecodeError, IOError):
             pass
     return dict(DEFAULT_CONFIG)
@@ -482,10 +587,43 @@ def save_config(config: dict) -> str:
             os.makedirs(dir_path, exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
-        _lang_cache = None # キャッシュをクリア
+        _lang_cache = None
         return t("msg_settings_saved")
     except IOError as e:
         return f"{t('msg_settings_err')} {e}"
+
+
+def check_individual_health(image_folder, memo_file, w1, w2, w3):
+    """
+    パスの生存確認を行い、各コンポーネント用の gr.update を返す。
+    空欄（未入力）の場合はエラーとせず、正常（✅なし）として扱う。
+    """
+    def get_status(path, ptype, label_base):
+        path = _clean_path(path)
+        if not path:
+            return gr.update(label=label_base, info="")
+        
+        exists = False
+        if ptype == "dir":
+            exists = os.path.isdir(path)
+        elif ptype == "file":
+            exists = os.path.isfile(path)
+        else:
+            exists = os.path.exists(path)
+        
+        if not exists:
+            # 威圧感を抑えつつ、❌マークとinfoで警告
+            return gr.update(label=f"❌ {label_base}", info=f"⚠️ {t('health_check_err').format(path=path)}")
+        else:
+            return gr.update(label=f"✅ {label_base}", info="")
+
+    return (
+        get_status(image_folder, "dir", t("image_folder")),
+        get_status(memo_file, "file", t("memo_file")),
+        get_status(w1, "any", t("wildcard_1")),
+        get_status(w2, "any", t("wildcard_2")),
+        get_status(w3, "any", t("wildcard_3")),
+    )
 
 
 # ======================================================================
@@ -495,10 +633,13 @@ def save_config(config: dict) -> str:
 def parse_memo_file(memo_path: str) -> dict:
     """
     メモファイルを解析する。
-    戻り値: { セクション名: {"positive": "...", "negative": "..."} }
+    戻り値: { セクション名: {"positive": "...", "negative": "...", "lora": [...]} }
     """
+    memo_path = _clean_path(memo_path)
     sections = {}
     if not memo_path or not os.path.isfile(memo_path):
+        if memo_path:
+            print(f"[Smart Img2Img Composer] Memo file not found: {memo_path}")
         return sections
 
     current_key = None
@@ -518,45 +659,57 @@ def parse_memo_file(memo_path: str) -> dict:
             sections[current_key] = {"positive": pos, "negative": neg, "lora": lora}
 
     try:
-        with open(memo_path, "r", encoding="utf-8") as f:
-            for raw_line in f:
-                line = raw_line.rstrip("\n\r")
-                stripped = line.strip()
+        content = ""
+        try:
+            with open(memo_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            try:
+                with open(memo_path, "r", encoding="utf-8-sig") as f:
+                    content = f.read()
+            except Exception:
+                with open(memo_path, "r", encoding="cp932", errors="ignore") as f:
+                    content = f.read()
+        except Exception:
+            return sections
 
-                if stripped.startswith("#"):
-                    continue
+        for line in content.splitlines():
+            stripped = line.strip()
 
-                match = re.match(r"^\[(.+)\]\s*$", stripped)
-                if match:
-                    save_section()
-                    current_key = match.group(1).strip().lower()
-                    current_mode = "positive"
-                    current_positive = []
-                    current_negative = []
-                    current_lora = []
-                    continue
+            if stripped.startswith("#"):
+                continue
 
-                if stripped.lower() in ("positive:", "positive"):
-                    current_mode = "positive"
-                    continue
-                if stripped.lower() in ("negative:", "negative"):
-                    current_mode = "negative"
-                    continue
-                if stripped.lower() in ("lora:", "lora"):
-                    current_mode = "lora"
-                    continue
+            match = re.match(r"^\[(.+)\]\s*$", stripped)
+            if match:
+                save_section()
+                current_key = match.group(1).strip().lower()
+                current_mode = "positive"
+                current_positive = []
+                current_negative = []
+                current_lora = []
+                continue
 
-                if current_key is not None and stripped:
-                    if current_mode == "negative":
-                        current_negative.append(stripped)
-                    elif current_mode == "lora":
-                        current_lora.append(stripped)
-                    else:
-                        current_positive.append(stripped)
+            if stripped.lower() in ("positive:", "positive"):
+                current_mode = "positive"
+                continue
+            if stripped.lower() in ("negative:", "negative"):
+                current_mode = "negative"
+                continue
+            if stripped.lower() in ("lora:", "lora"):
+                current_mode = "lora"
+                continue
+
+            if current_key is not None and stripped:
+                if current_mode == "negative":
+                    current_negative.append(stripped)
+                elif current_mode == "lora":
+                    current_lora.append(stripped)
+                else:
+                    current_positive.append(stripped)
 
         save_section()
-    except IOError:
-        pass
+    except Exception as e:
+        print(f"[Smart Img2Img Composer] Memo parse error: {e}")
 
     return sections
 
@@ -574,12 +727,16 @@ def _join_lines(lines: list) -> str:
 # ======================================================================
 
 def get_image_files(folder: str) -> list:
+    folder = _clean_path(folder)
     if not folder or not os.path.isdir(folder):
         return []
     return [
         os.path.join(folder, f)
-        for f in os.listdir(folder)
-        if os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS
+        for f in sorted(os.listdir(folder))
+        if (os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS
+            and not f.startswith(".")
+            and "config" not in f.lower()
+            and "memo" not in f.lower())
     ]
 
 
@@ -590,26 +747,24 @@ def match_image_to_sections(image_path: str, sections: dict, threshold: float) -
 
     from difflib import SequenceMatcher
     filename = os.path.splitext(os.path.basename(image_path))[0].lower()
-    
+
     best_matches = []
     max_score = 0
-    
+
     for section in sections.keys():
         if section.lower() == "default":
             continue
-        
-        # 類似度スコア (0.0 - 1.0)
+
         score = SequenceMatcher(None, filename, section.lower()).ratio()
-        
+
         if score >= threshold:
             if score > max_score:
                 max_score = score
                 best_matches = [section]
             elif score == max_score:
                 best_matches.append(section)
-    
+
     if best_matches:
-        # スコア最大のものが1つならそれを、複数なら最初の1つを返す
         target_section = best_matches[0]
         return [sections[target_section]]
 
@@ -617,20 +772,33 @@ def match_image_to_sections(image_path: str, sections: dict, threshold: float) -
 
 
 def check_lora_exists(lora_str: str) -> bool:
-    """Loraが実際にインストールされているか確認する。ImportError時はFalseを返す"""
+    """
+    LoRAが実際にインストールされているか確認する。
+    Bug Fix: lora_registry.items() を正しくメソッド呼び出しするよう修正。
+    """
     try:
         from modules import extra_networks
-        # <lora:name:weight> または name:weight から name を抽出
         raw = lora_str.replace("<", "").replace(">", "")
         if ":" not in raw:
             return False
         parts = raw.split(":")
         lora_name = parts[1].strip() if parts[0].lower() == "lora" else parts[0].strip()
-        
-        # A1111内部の拡張ネットワークから検索
-        return lora_name in extra_networks.extra_network_registry["lora"].items
+
+        registry = getattr(extra_networks, "extra_network_registry", {})
+        lora_registry = registry.get("lora")
+        if lora_registry and hasattr(lora_registry, "items"):
+            # Bug Fix: .items はメソッドであり dict ではない → .items() を呼び出す
+            # または networks モジュールから直接検索する
+            try:
+                items_dict = lora_registry.items()
+                return lora_name in dict(items_dict)
+            except TypeError:
+                # items が dict の場合 (属性として定義されている場合)
+                return lora_name in lora_registry.items
+        return False
     except (ImportError, KeyError, AttributeError):
         return False
+
 
 def _clean_prompt(prompt: str) -> str:
     """カンマ区切りのプロンプトから重複を削除し、クリーニングする"""
@@ -645,8 +813,43 @@ def _clean_prompt(prompt: str) -> str:
             unique.append(p)
     return ", ".join(unique)
 
+
+def get_random_asset(path: str) -> str:
+    """指定されたテキストファイルからランダムに1行選んで返す"""
+    path = _clean_path(path)
+    if not path:
+        return ""
+    if not os.path.exists(path):
+        print(f"[Smart Img2Img Composer] Asset file not found: {path}")
+        return ""
+    try:
+        content = ""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            try:
+                with open(path, "r", encoding="utf-8-sig") as f:
+                    content = f.read()
+            except Exception:
+                with open(path, "r", encoding="cp932", errors="ignore") as f:
+                    content = f.read()
+
+        lines = [l.strip() for l in content.splitlines() if l.strip() and not l.strip().startswith("#")]
+        if not lines:
+            return ""
+
+        row = random.choice(lines)
+        if ":" in row:
+            row = re.sub(r"(:)(\d+\.\d+)\.\d+(\)|>)", r"\1\2\3", row)
+        return row
+    except Exception as e:
+        print(f"[Smart Img2Img Composer] Asset load error ({path}): {e}")
+        return ""
+
+
 def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, selection_mode="Random") -> tuple:
-    """戻り値: (画像パス, positive, negative, ログ)"""
+    """戻り値: (画像パス, positive, negative, ログ, matched_section_name)"""
     log = []
     config = load_config()
     fallback_enabled = config.get("fallback_enabled", True)
@@ -654,7 +857,7 @@ def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, se
 
     image_files = get_image_files(image_folder)
     if not image_files:
-        return None, "", "", t("msg_no_images")
+        return None, "", "", t("no_images"), ""
 
     if selection_mode == "sequential":
         last_index = config.get("last_sequential_index", 0)
@@ -662,30 +865,64 @@ def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, se
         selected = image_files[index]
         config["last_sequential_index"] = index + 1
         save_config(config)
-        log.append(t("log_sel_sequential").format(index=index+1, total=len(image_files), filename=os.path.basename(selected)))
+        log.append(t("log_sel_sequential").format(index=index + 1, total=len(image_files), filename=os.path.basename(selected)))
     else:
         selected = random.choice(image_files)
         log.append(t("log_sel_random").format(filename=os.path.basename(selected)))
 
+    print(f"[Smart Img2Img Composer] Selected image: {selected}")
+
     sections = parse_memo_file(memo_file)
     if not sections:
         log.append(t("log_no_sections"))
-        return selected, "", "", "\n".join(log)
+        return selected, "", "", "\n".join(log), ""
 
     log.append(t("log_sections_count").format(count=len(sections)))
     matched = match_image_to_sections(selected, sections, match_threshold)
 
+    # Bug Fix: matched_section_name を追跡して before_process で使えるようにする
+    matched_section_name = ""
+
     if not matched:
         if fallback_enabled and "default" in sections:
+            print(f"[Smart Img2Img Composer] No match for {os.path.basename(selected)}. Fallback to [default].")
             log.append(t("log_fallback"))
             matched = [sections["default"]]
+            matched_section_name = "default"
+        else:
+            print(f"[Smart Img2Img Composer] No match for {os.path.basename(selected)}. (Match failed)")
+            log.append(t("log_no_match"))
+            return selected, "", "", "\n".join(log), ""
+    else:
+        # マッチしたセクション名を取得
+        filename = os.path.splitext(os.path.basename(selected))[0].lower()
+        from difflib import SequenceMatcher
+        for section in sections.keys():
+            if section == "default":
+                continue
+            score = SequenceMatcher(None, filename, section.lower()).ratio()
+            if score >= match_threshold:
+                matched_section_name = section
+                break
+
+    final_matched = []
+    for m in matched:
+        if m.get("positive") or m.get("negative") or m.get("lora"):
+            final_matched.append(m)
+
+    if not final_matched:
+        if fallback_enabled and "default" in sections:
+            print(f"[Smart Img2Img Composer] Matched section is empty. Fallback to [default].")
+            log.append(t("log_fallback"))
+            final_matched = [sections["default"]]
+            matched_section_name = "default"
         else:
             log.append(t("log_no_match"))
-            return selected, "", "", "\n".join(log)
+            return selected, "", "", "\n".join(log), ""
 
     pos_parts, neg_parts, lora_parts = [], [], []
     seen_pos, seen_neg, seen_lora = set(), set(), set()
-    for m in matched:
+    for m in final_matched:
         p = m.get("positive", "")
         n = m.get("negative", "")
         l_list = m.get("lora", [])
@@ -717,7 +954,7 @@ def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, se
     if negative:
         log.append(f"🚫 Negative: {negative}")
 
-    return selected, positive, negative, "\n".join(log)
+    return selected, positive, negative, "\n".join(log), matched_section_name
 
 
 # ======================================================================
@@ -725,26 +962,62 @@ def compose_prompt(image_folder: str, memo_file: str, match_threshold: float, se
 # ======================================================================
 
 def preview_compose(image_folder, memo_file, match_threshold):
-    selected, positive, negative, log = compose_prompt(
+    config = load_config()
+    selected, positive, negative, log_str, _ = compose_prompt(
         image_folder, memo_file, match_threshold
     )
+
+    log = [log_str] if log_str else []
+
+    asset_slots = [
+        (config.get("enable_random_char", False), LORA_CHAR_PATH, config.get("pos_char", "Back"), "Char"),
+        (config.get("enable_random_sit", False), LORA_SIT_PATH, config.get("pos_sit", "Back"), "Sit"),
+        (config.get("enable_random_w1", False), config.get("wildcard_1_path", WILD_1_PATH), config.get("pos_w1", "Back"), "W1"),
+        (config.get("enable_random_w2", False), config.get("wildcard_2_path", WILD_2_PATH), config.get("pos_w2", "Back"), "W2"),
+        (config.get("enable_random_w3", False), config.get("wildcard_3_path", WILD_3_PATH), config.get("pos_w3", "Back"), "W3"),
+    ]
+
+    f_assets, b_assets, asset_logs = [], [], []
+    for en, path, pos, name in asset_slots:
+        if en:
+            line = get_random_asset(path)
+            if line:
+                if pos == t("pos_front") or pos == "Front":
+                    f_assets.insert(0, line)
+                else:
+                    b_assets.append(line)
+                asset_logs.append(f"{name}: {line}")
+
+    if asset_logs:
+        log.append(f"🎲 Preview Assets: {' | '.join(asset_logs)}")
+
+        parts = []
+        if f_assets:
+            parts.append(", ".join(f_assets))
+        if positive:
+            parts.append(positive)
+        if b_assets:
+            parts.append(", ".join(b_assets))
+        positive = ", ".join(parts)
+
     img = None
     if selected and os.path.isfile(selected):
         try:
             img = Image.open(selected)
         except Exception:
             pass
-    return img, positive, negative, log
+    return img, positive, negative, "\n".join(log)
 
 
 def save_all_settings(language, image_folder, memo_file, match_threshold, generation_count, fallback, auto_lora,
-                      gen_confidence, gen_positive, gen_negative, gen_custom, cat_base, cat_char, cat_nsfw):
+                      gen_confidence, gen_positive, gen_negative, gen_custom, cat_base, cat_char, cat_nsfw,
+                      w1_path, w2_path, w3_path, lora_offset, output_sort_mode):
     config = load_config()
     categories = cat_base + cat_char + cat_nsfw
     config.update({
         "language": language,
-        "image_folder": image_folder,
-        "memo_file": memo_file,
+        "image_folder": _clean_path(image_folder),
+        "memo_file": _clean_path(memo_file),
         "match_threshold": match_threshold,
         "generation_count": int(generation_count),
         "fallback_enabled": fallback,
@@ -754,6 +1027,11 @@ def save_all_settings(language, image_folder, memo_file, match_threshold, genera
         "gen_negative": gen_negative,
         "gen_custom_dict": gen_custom,
         "gen_categories": categories,
+        "wildcard_1_path": _clean_path(w1_path),
+        "wildcard_2_path": _clean_path(w2_path),
+        "wildcard_3_path": _clean_path(w3_path),
+        "lora_offset": float(lora_offset) if lora_offset is not None else 0.0,
+        "output_sort_mode": output_sort_mode,
     })
     return save_config(config)
 
@@ -761,9 +1039,7 @@ def save_all_settings(language, image_folder, memo_file, match_threshold, genera
 # ======================================================================
 # WD14 Tagger 連携 — タグフィルタリング
 # ======================================================================
-# img2imgで元キャラに干渉しないタグのみ通す（構図/ポーズ/シーン/照明）
 
-# ── 許可タグカテゴリ辞書 ──
 _TAG_CATEGORIES = {
     "cat_composition": {
         "portrait", "upper_body", "lower_body", "full_body",
@@ -940,8 +1216,8 @@ _TAG_CATEGORIES = {
         "masturbation", "fingering", "cunnilingus", "anilingus", "anal", "vaginal", "oral",
         "tribadism", "reverse_cowgirl_position", "cowgirl_position", "mating_press", "spanking",
         "threesome", "group_sex", "gangbang", "orgy",
-        "facesitting", "smothering", "breast_smother", "double_penetration", "triple_penetration", 
-        "futa_with_futa", "futa_on_female", "choking", "asphyxiation", "spitroast", "thigh_sex", 
+        "facesitting", "smothering", "breast_smother", "double_penetration", "triple_penetration",
+        "futa_with_futa", "futa_on_female", "choking", "asphyxiation", "spitroast", "thigh_sex",
         "armpit_sex", "deepthroat",
         "prone_bone", "lying_on_back", "glory_wall", "standing_sex", "standing_split_sex", "anvil_position",
         "girl_on_top", "boy_on_top", "straddling", "upright_straddle", "reverse_upright_straddle",
@@ -999,7 +1275,7 @@ _TAG_CATEGORIES = {
         "mind_break", "corruption", "trance", "hypnotized"
     },
     "cat_nsfw_clothes_mess": {
-        "clothes_pull", "tearing_clothes", "skirt_lift", "shirt_lift", "undressing", 
+        "clothes_pull", "tearing_clothes", "skirt_lift", "shirt_lift", "undressing",
         "panties_pulled_down", "half-closed_eyes", "partially_unbuttoned",
         "micro_bikini", "slingshot_swimsuit", "pasties",
         "nip_slip", "wardrobe_malfunction", "torn_clothes", "see-through",
@@ -1031,13 +1307,13 @@ _TAG_CATEGORIES = {
 
 _compiled_cat_patterns = {}
 
+
 def _filter_tags(tags: dict, confidence_threshold: float = 0.35, selected_categories=None) -> dict:
     """許可タグカテゴリに含まれるタグのみ残すフィルタ (正規表現をキャッシュ)"""
     global _compiled_cat_patterns
     if selected_categories is None:
         selected_categories = list(_TAG_CATEGORIES.keys())
 
-    # カテゴリの組み合わせをキーにしてキャッシュ
     cache_key = tuple(sorted(selected_categories))
     if cache_key in _compiled_cat_patterns:
         allowed_tags, allowed_patterns = _compiled_cat_patterns[cache_key]
@@ -1057,18 +1333,18 @@ def _filter_tags(tags: dict, confidence_threshold: float = 0.35, selected_catego
     for tag, score in tags.items():
         if score < confidence_threshold:
             continue
-            
+
         tag_clean = tag.strip().lower().replace(" ", "_")
-        
+
         if tag_clean in allowed_tags:
             filtered[tag_clean] = score
             continue
-            
+
         for p in allowed_patterns:
             if p.search(tag_clean):
                 filtered[tag_clean] = score
                 break
-                
+
     return filtered
 
 
@@ -1082,14 +1358,12 @@ def _tags_to_prompt(tags: dict) -> str:
 
 def _find_tagger():
     """WD14 Tagger モジュールを検索"""
-    # 方法1: 直接import
     try:
         from tagger import interrogator as tagger_mod
         return tagger_mod, None
     except ImportError:
         pass
 
-    # 方法2: extensions ディレクトリを走査して手動追加
     try:
         webui_root = os.path.dirname(os.path.dirname(EXTENSION_DIR))
         extensions_dir = os.path.join(webui_root, "extensions")
@@ -1124,11 +1398,9 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
         all_tags = {}
         success = False
 
-        # パターン1: 推奨 - tagger.utils.interrogators から実体インスタンスを取得
         try:
             from tagger import utils as tagger_utils
             if hasattr(tagger_utils, "interrogators") and isinstance(tagger_utils.interrogators, dict) and tagger_utils.interrogators:
-                # デフォルトモデルを探す、なければ最初のもの
                 default_model = "wd14-convnext.v2"
                 if default_model in tagger_utils.interrogators:
                     interrogator_obj = tagger_utils.interrogators[default_model]
@@ -1136,7 +1408,6 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
                     interrogator_obj = list(tagger_utils.interrogators.values())[0]
 
                 res = interrogator_obj.interrogate(pil_image)
-                # res は (rating_dict, tag_dict) のタプル
                 if isinstance(res, tuple) and len(res) >= 2:
                     all_tags = res[1] if isinstance(res[1], dict) else {}
                     success = True
@@ -1148,7 +1419,6 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
         except Exception as e:
             print(f"[Random Composer] tagger.utils pattern error: {e}")
 
-        # パターン2: tagger.api.interrogate (新しいWD14拡張のエンドポイント)
         if not success:
             try:
                 import tagger.api as tagger_api
@@ -1166,7 +1436,6 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
             except Exception:
                 pass
 
-        # パターン3: インタロゲータークラスのget_interrogators
         if not success and hasattr(tagger_mod, "Interrogator"):
             cls = tagger_mod.Interrogator
             interrogators_dict = {}
@@ -1181,8 +1450,6 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
 
             if interrogators_dict:
                 interrogator_obj = list(interrogators_dict.values())[0]
-                
-                # 自動ロードを期待してそのままinterrogate
                 res = interrogator_obj.interrogate(pil_image)
                 if isinstance(res, tuple) and len(res) >= 2:
                     all_tags = res[1] if isinstance(res[1], dict) else {}
@@ -1204,26 +1471,27 @@ def _interrogate_image(pil_image, confidence_threshold: float = 0.35, selected_c
 # プロンプト自動生成
 # ======================================================================
 
-def get_stable_dimensions(img, mode="slider", slider_val=1024, min_val=1024, max_val=1536):
-    """画像のアスペクト比を維持しつつ、指定されたモードと範囲に合わせて解像度を返す"""
+def get_stable_dimensions(img, mode="slider", slider_val=1024, min_val=512, max_val=1024):
+    """
+    画像のアスペクト比を維持しつつ、指定されたモードと範囲に合わせて解像度を返す。
+    Bug Fix: min_val/max_val のデフォルト値を SD1.5 向けの 512/1024 に修正。
+    """
     if not img:
         return slider_val, slider_val
     w, h = img.size
     aspect = w / h
-    
-    new_w, new_h = w, h
+
+    new_w, new_h = float(w), float(h)
     max_edge = max(w, h)
 
     if mode == "slider":
-        # スライダーの値に長辺を強制
         if w > h:
             new_w = slider_val
-            new_h = int(new_w / aspect)
+            new_h = new_w / aspect
         else:
             new_h = slider_val
-            new_w = int(new_h * aspect)
+            new_w = new_h * aspect
     elif mode == "range":
-        # 指定範囲内に長辺を収める
         if max_edge < min_val:
             scale = min_val / max_edge
             new_w = w * scale
@@ -1233,10 +1501,10 @@ def get_stable_dimensions(img, mode="slider", slider_val=1024, min_val=1024, max
             new_w = w * scale
             new_h = h * scale
 
-    # SDで安定しやすいよう64の倍数にスナップ
     new_w = max(64, round(new_w / 64) * 64)
     new_h = max(64, round(new_h / 64) * 64)
     return new_w, new_h
+
 
 def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_base, cat_char, cat_nsfw, custom_dict_str):
     """画像を解析してメモエントリを生成"""
@@ -1264,7 +1532,6 @@ def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_
         if excluded_count > 0:
             log_lines.append(t("log_excluded_tags").format(count=excluded_count))
 
-        # ==== 好みのプロンプトの条件付与 ====
         matched_custom_prompts = []
         if custom_dict_str and custom_dict_str.strip():
             for line in custom_dict_str.splitlines():
@@ -1274,29 +1541,22 @@ def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_
                 separator = "=>" if "=>" in line else "->" if "->" in line else ">" if ">" in line else None
                 if not separator:
                     continue
-                
+
                 left, right = line.split(separator, 1)
                 condition_tags = [t_tag.strip().lower().replace(" ", "_") for t_tag in left.split(",")]
                 right_prompt = right.strip()
-                
+
                 if not condition_tags or not right_prompt:
                     continue
-                
-                # すべての条件タグが抽出された全タグ(all_tags)に含まれているかチェック
-                match = True
-                for c_tag in condition_tags:
-                    if c_tag not in all_tags:
-                        match = False
-                        break
-                
+
+                match = all(c_tag in all_tags for c_tag in condition_tags)
+
                 if match:
                     matched_custom_prompts.append(right_prompt)
                     log_lines.append(t("log_custom_match").format(cond=left, prompt=right_prompt))
 
-        # タグの文字列化
         generated_tags = _tags_to_prompt(filtered)
 
-        # デフォルトポジティブ、カスタムプロンプト、抽出タグを結合
         components = []
         if pos:
             components.append(pos)
@@ -1304,14 +1564,14 @@ def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_
             components.extend(matched_custom_prompts)
         if generated_tags:
             components.append(generated_tags)
-            
+
         final_positive = ", ".join(components)
 
         if not final_positive:
             log_lines.append(t("log_no_pos_prompt"))
         else:
             log_lines.append(f"📝 Positive: {final_positive}")
-            
+
         if neg:
             log_lines.append(f"🚫 Negative: {neg}")
 
@@ -1323,7 +1583,8 @@ def autogen_prompt(image, section_name, confidence, pos_prompt, neg_prompt, cat_
             f"negative:\n"
             f"{neg}\n"
         )
-        w, h = get_stable_dimensions(image)
+        # Bug Fix: autogen_prompt から呼ぶ get_stable_dimensions は range モードで SD1.5 範囲を使用
+        w, h = get_stable_dimensions(image, mode="range", min_val=512, max_val=1024)
         return entry, "\n".join(log_lines), final_positive, neg, str(w), str(h)
 
     except Exception as e:
@@ -1365,11 +1626,10 @@ def append_to_memo(memo_path, entry):
 # ======================================================================
 
 class RandomComposerScript(scripts.Script):
-    # Dynamic Promptsなどの他スクリプトよりも先に実行させるため、優先度を低く設定
     sorting_priority = -100
 
     def title(self):
-        return "Smart Img2Img Composer"
+        return "Smart Img2Img Composer (v2.4.1)"
 
     def show(self, is_img2img):
         return scripts.AlwaysVisible if is_img2img else False
@@ -1384,25 +1644,25 @@ class RandomComposerScript(scripts.Script):
                 value=False,
                 elem_id="smart_composer_enabled",
             )
-            # アセット設定
-            with gr.Column():
-                with gr.Row():
-                    en_char = gr.Checkbox(label=t("enable_random_char"), value=False, elem_id="smart_composer_en_char")
-                    pos_char = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
-                with gr.Row():
-                    en_sit = gr.Checkbox(label=t("enable_random_sit"), value=False, elem_id="smart_composer_en_sit")
-                    pos_sit = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
-                with gr.Row():
-                    en_w1 = gr.Checkbox(label=t("wildcard_1"), value=False, elem_id="smart_composer_en_w1")
-                    pos_w1 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
-                with gr.Row():
-                    en_w2 = gr.Checkbox(label=t("wildcard_2"), value=False, elem_id="smart_composer_en_w2")
-                    pos_w2 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
-                with gr.Row():
-                    en_w3 = gr.Checkbox(label=t("wildcard_3"), value=False, elem_id="smart_composer_en_w3")
-                    pos_w3 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+            # アセット設定 (UI/UX: 有効時の視覚的ハイライトはCSSで対応)
+            with gr.Accordion(t("accordion_assets"), open=True):
+                with gr.Column():
+                    with gr.Row():
+                        en_char = gr.Checkbox(label=t("enable_random_char"), value=False, elem_id="smart_composer_en_char")
+                        pos_char = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                    with gr.Row():
+                        en_sit = gr.Checkbox(label=t("enable_random_sit"), value=False, elem_id="smart_composer_en_sit")
+                        pos_sit = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                    with gr.Row():
+                        en_w1 = gr.Checkbox(label=t("wildcard_1"), value=False, elem_id="smart_composer_en_w1")
+                        pos_w1 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                    with gr.Row():
+                        en_w2 = gr.Checkbox(label=t("wildcard_2"), value=False, elem_id="smart_composer_en_w2")
+                        pos_w2 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                    with gr.Row():
+                        en_w3 = gr.Checkbox(label=t("wildcard_3"), value=False, elem_id="smart_composer_en_w3")
+                        pos_w3 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
 
-            # 画像選択モード
             _sel_choices = [(t("sel_random"), "random"), (t("sel_sequential"), "sequential")]
             selection_mode = gr.Radio(
                 label=t("selection_mode"),
@@ -1415,7 +1675,6 @@ class RandomComposerScript(scripts.Script):
                 value=True,
                 elem_id="smart_composer_override",
             )
-            # リサイズモード
             _resize_choices = [
                 t("resize_none"),
                 t("resize_slider"),
@@ -1429,73 +1688,56 @@ class RandomComposerScript(scripts.Script):
                 value=_resize_choices[0],
                 elem_id="smart_composer_resize_mode",
             )
-
             base_resolution = gr.Slider(
                 label=t("base_resolution"),
                 minimum=512, maximum=2048, step=64,
                 value=1024,
                 elem_id="smart_composer_base_resolution",
             )
-        return [enabled, override_prompt, resize_mode, base_resolution, selection_mode, en_char, pos_char, en_sit, pos_sit, en_w1, pos_w1, en_w2, pos_w2, en_w3, pos_w3]
+            with gr.Accordion(t("output_settings"), open=False):
+                output_sort_mode = gr.Dropdown(
+                    label=t("sort_mode"),
+                    choices=[t("sort_none"), t("sort_preset"), t("sort_section"), t("sort_date")],
+                    value=t("sort_none")
+                )
 
-    def process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode, base_resolution, selection_mode, en_char, pos_char, en_sit, pos_sit, en_w1, pos_w1, en_w2, pos_w2, en_w3, pos_w3):
-        """process メソッドでプロンプト注入を行う。
-        getattr(p, '_smart_composer_processed', False) を使って二重実行を防止する。
-        """
+        return [enabled, override_prompt, resize_mode, base_resolution, selection_mode, en_char, pos_char, en_sit, pos_sit, en_w1, pos_w1, en_w2, pos_w2, en_w3, pos_w3, output_sort_mode]
+
+    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode, base_resolution, selection_mode, en_char, pos_char, en_sit, pos_sit, en_w1, pos_w1, en_w2, pos_w2, en_w3, pos_w3, output_sort_mode):
         if not enabled:
             return
 
-        # すでにこの処理オブジェクトで実行済みならスキップ
         if getattr(p, "_smart_composer_processed", False):
             return
 
         config = load_config()
-        selected, positive, negative, log = compose_prompt(
+        # Bug Fix: compose_prompt が matched_section_name も返すよう変更
+        selected, positive, negative, log, matched_section_name = compose_prompt(
             config.get("image_folder", ""),
             config.get("memo_file", ""),
             config.get("match_threshold", 0.3),
             selection_mode
         )
-        
+
         log_list = [log] if log else []
 
-        # アセット設定の準備（各スロットの設定をタプル化）
         asset_slots = [
             (en_char, LORA_CHAR_PATH, pos_char, "Char"),
             (en_sit, LORA_SIT_PATH, pos_sit, "Sit"),
-            (en_w1, WILD_1_PATH, pos_w1, "W1"),
-            (en_w2, WILD_2_PATH, pos_w2, "W2"),
-            (en_w3, WILD_3_PATH, pos_w3, "W3"),
+            (en_w1, config.get("wildcard_1_path", WILD_1_PATH), pos_w1, "W1"),
+            (en_w2, config.get("wildcard_2_path", WILD_2_PATH), pos_w2, "W2"),
+            (en_w3, config.get("wildcard_3_path", WILD_3_PATH), pos_w3, "W3"),
         ]
 
-        def get_random_asset(path):
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    lines = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
-                if lines:
-                    return random.choice(lines)
-            return None
-
-        # 内部的な生成回数（Batch count）の設定
         generation_count = config.get("generation_count", 1)
         if generation_count > p.n_iter:
             p.n_iter = generation_count
-            # n_iter を増やした場合、内部のプロンプトリスト等も拡張しないと2枚目以降が空になる可能性がある
-            if hasattr(p, "all_prompts") and len(p.all_prompts) < p.n_iter:
-                p.all_prompts = [p.prompt] * (p.n_iter * p.batch_size)
-            if hasattr(p, "all_negative_prompts") and len(p.all_negative_prompts) < p.n_iter:
-                p.all_negative_prompts = [p.negative_prompt] * (p.n_iter * p.batch_size)
-            if hasattr(p, "all_seeds") and len(p.all_seeds) < p.n_iter:
-                p.all_seeds = [p.seed] * (p.n_iter * p.batch_size)
-            if hasattr(p, "all_subseeds") and len(p.all_subseeds) < p.n_iter:
-                p.all_subseeds = [p.subseed] * (p.n_iter * p.batch_size)
 
         if selected:
             try:
                 img = Image.open(selected).convert("RGB")
                 p.init_images = [img]
-                
-                # 画像サイズ自動調整
+
                 _resize_choices = [
                     t("resize_none"),
                     t("resize_slider"),
@@ -1506,90 +1748,111 @@ class RandomComposerScript(scripts.Script):
                 resize_idx = -1
                 if resize_mode in _resize_choices:
                     resize_idx = _resize_choices.index(resize_mode)
-                
-                if resize_idx > 0:  # 0 = "Do not resize"
+
+                if resize_idx > 0:
                     mode_flag = "slider"
                     min_v, max_v = 1024, 1536
                     s_val = int(base_resolution) if base_resolution else 1024
-                    
-                    if resize_idx == 2: # 512~1024
+
+                    if resize_idx == 2:
                         mode_flag = "range"
                         min_v, max_v = 512, 1024
-                    elif resize_idx == 3: # 1024~1536
+                    elif resize_idx == 3:
                         mode_flag = "range"
                         min_v, max_v = 1024, 1536
-                    elif resize_idx == 4: # 1536~1792
+                    elif resize_idx == 4:
                         mode_flag = "range"
                         min_v, max_v = 1536, 1792
-                        
+
                     new_w, new_h = get_stable_dimensions(img, mode_flag, s_val, min_v, max_v)
                     p.width = new_w
                     p.height = new_h
             except Exception as e:
                 print(f"[Smart Img2Img Composer] 画像読み込み失敗: {selected}, Error: {e}")
 
-        # プロンプトの注入用の定義
         def inject(current_val, new_val, override):
             if override:
                 return new_val
             return f"{current_val}, {new_val}" if current_val else new_val
 
-        # プロンプトの注入（p.prompt だけでなく all_prompts も更新する）
-        if hasattr(p, "all_prompts") and p.all_prompts:
-            new_prompts = []
-            first_img_asset_log = []
-            
-            for i, original_v in enumerate(p.all_prompts):
-                working_p = original_v
-                # 1. メモファイルのプロンプト
-                if positive:
-                    working_p = inject(working_p, positive, override_prompt)
-                
-                # 2. 個別ランダムアセット
-                f_assets = []
-                b_assets = []
-                img_logs = []
-                for en, path, pos, name in asset_slots:
-                    if en:
-                        line = get_random_asset(path)
-                        if line:
-                            if pos == t("pos_front"):
-                                f_assets.insert(0, line)
-                            else:
-                                b_assets.append(line)
-                            img_logs.append(f"{name}: {line}")
-                
-                # 合成: Front + Working + Back
-                parts = []
-                if f_assets:
-                    parts.append(", ".join(f_assets))
-                parts.append(working_p)
-                if b_assets:
-                    parts.append(", ".join(b_assets))
-                
-                final_p = _clean_prompt(", ".join(parts))
-                new_prompts.append(final_p)
-                
-                if i == 0:
-                    first_img_asset_log = img_logs
-
-            p.all_prompts = new_prompts
-            if new_prompts:
-                p.prompt = new_prompts[0]
-            if first_img_asset_log:
-                log_list.append(f"🎲 Random Assets: {' | '.join(first_img_asset_log)}")
-
-        # ネガティブプロンプトの注入
+        if positive:
+            p.prompt = inject(p.prompt, positive, override_prompt)
         if negative:
             p.negative_prompt = inject(p.negative_prompt, negative, override_prompt)
-            if hasattr(p, "all_negative_prompts") and p.all_negative_prompts:
-                p.all_negative_prompts = [inject(x, negative, override_prompt) for x in p.all_negative_prompts]
+
+        f_assets = []
+        b_assets = []
+        asset_logs = []
+        for en, path, pos, name in asset_slots:
+            if en:
+                line = get_random_asset(path)
+                if line:
+                    if pos == t("pos_front") or pos == "Front":
+                        f_assets.insert(0, line)
+                    else:
+                        b_assets.append(line)
+                    asset_logs.append(f"{name}: {line}")
+
+        parts = []
+        if f_assets:
+            parts.append(", ".join(f_assets))
+        parts.append(p.prompt)
+        if b_assets:
+            parts.append(", ".join(b_assets))
+
+        p.prompt = _clean_prompt(", ".join(parts))
+
+        # Bug Fix: output_sort_mode の section 振り分けで matched_section_name を使用
+        if output_sort_mode and output_sort_mode != t("sort_none") and output_sort_mode != "None":
+            try:
+                from datetime import datetime
+                sub_name = ""
+                if output_sort_mode in (t("sort_preset"), "Preset"):
+                    sub_name = config.get("last_preset_name", "Default")
+                elif output_sort_mode in (t("sort_section"), "Section"):
+                    # Bug Fix: locals()['matched'] 参照を廃止し matched_section_name を使用
+                    raw_name = matched_section_name or "Default"
+                    sub_name = re.sub(r'[\\/:*?"<>|]', '_', raw_name)
+                elif output_sort_mode in (t("sort_date"), "Date"):
+                    sub_name = datetime.now().strftime("%Y-%m-%d")
+
+                if sub_name:
+                    p.outpath_samples = os.path.join(p.outpath_samples, sub_name)
+                    os.makedirs(p.outpath_samples, exist_ok=True)
+                    log_list.append(f"📁 Output subfolder: {sub_name}")
+            except Exception as e:
+                print(f"[Smart Img2Img Composer] Folder sorting failed: {e}")
+
+        offset = config.get("lora_offset", 0.0)
+        if offset != 0.0:
+            def apply_offset(match):
+                pre, name, val, post = match.groups()
+                try:
+                    new_val = float(val) + offset
+                    return f"{pre}{name}:{new_val:.2f}{post}"
+                except Exception:
+                    return match.group(0)
+
+            p.prompt = re.sub(r"(<lora:)([^:]+):([-+]?\d*\.?\d+)(>)", apply_offset, p.prompt)
+            p.negative_prompt = re.sub(r"(<lora:)([^:]+):([-+]?\d*\.?\d+)(>)", apply_offset, p.negative_prompt)
+            log_list.append(f"⚖️ LoRA Offset applied: {offset:+.2f}")
+
+        if asset_logs:
+            log_list.append(f"🎲 Random Assets: {' | '.join(asset_logs)}")
+
+        if p.prompt:
+            log_list.append(f"📜 Combined Prompt: {p.prompt}")
+        print(f"[Smart Img2Img Composer] Final Prompt: {p.prompt}")
 
         p._smart_composer_processed = True
-        
+
         final_log = "\n".join(log_list)
         if final_log:
             print(f"[Smart Img2Img Composer]\n{final_log}")
+
+    def process(self, p, *args):
+        pass
+
 
 # ======================================================================
 # 独立タブ UI
@@ -1600,29 +1863,124 @@ def on_ui_tabs():
 
     with gr.Blocks(analytics_enabled=False) as tab:
         gr.Markdown(
-            "# 🎲 Smart Img2Img Composer (v2.2.1)\n"
+            "# 🎲 Smart Img2Img Composer (v2.4.2)\n"
             + t("tab_header")
         )
 
+
+        def handle_save_preset(name, lang, img_f, memo, threshold, count, fallback, auto_l, offset, w1, w2, w3, sort):
+            if not name:
+                return "Error: Name required", gr.update()
+            config = load_config()
+            presets = config.get("presets", {})
+            presets[name] = {
+                "language": lang,
+                "image_folder": _clean_path(img_f),
+                "memo_file": _clean_path(memo),
+                "match_threshold": threshold,
+                "generation_count": count,
+                "fallback_enabled": fallback,
+                "auto_lora_enabled": auto_l,
+                "lora_offset": offset,
+                "wildcard_1_path": _clean_path(w1),
+                "wildcard_2_path": _clean_path(w2),
+                "wildcard_3_path": _clean_path(w3),
+                "output_sort_mode": sort,
+            }
+            config["presets"] = presets
+            config["last_preset_name"] = name
+            save_config(config)
+            return f"✅ Preset '{name}' saved!", gr.update(choices=["Default"] + list(presets.keys()))
+
+        def handle_load_preset(name):
+            if name == "Default":
+                config = load_config()
+                config["last_preset_name"] = "Default"
+                save_config(config)
+                vals = ("ja", "", "", 0.3, 1, True, True, 0.0, WILD_1_PATH, WILD_2_PATH, WILD_3_PATH, t("sort_none"))
+                health = check_individual_health("", "", WILD_1_PATH, WILD_2_PATH, WILD_3_PATH)
+                return vals + health
+            config = load_config()
+            config["last_preset_name"] = name
+            save_config(config)
+            p = config.get("presets", {}).get(name)
+            if not p:
+                return (gr.update(),) * (12 + 5)
+            vals = (
+                p.get("language", "ja"),
+                p.get("image_folder", ""),
+                p.get("memo_file", ""),
+                p.get("match_threshold", 0.3),
+                p.get("generation_count", 1),
+                p.get("fallback_enabled", True),
+                p.get("auto_lora_enabled", True),
+                p.get("lora_offset", 0.0),
+                p.get("wildcard_1_path", WILD_1_PATH),
+                p.get("wildcard_2_path", WILD_2_PATH),
+                p.get("wildcard_3_path", WILD_3_PATH),
+                p.get("output_sort_mode", t("sort_none")),
+            )
+            health = check_individual_health(
+                p.get("image_folder", ""), p.get("memo_file", ""),
+                p.get("wildcard_1_path", WILD_1_PATH), p.get("wildcard_2_path", WILD_2_PATH), p.get("wildcard_3_path", WILD_3_PATH)
+            )
+            return vals + health
+
+        def handle_delete_preset(name):
+            if not name or name == "Default":
+                return "Cannot delete Default", gr.update()
+            config = load_config()
+            presets = config.get("presets", {})
+            if name in presets:
+                del presets[name]
+                config["presets"] = presets
+                save_config(config)
+                return f"🗑️ Deleted '{name}'", gr.update(choices=["Default"] + list(presets.keys()), value="Default")
+            return "Not found", gr.update()
+
+        # Helper for initial labels
+        initial_config = load_config()
+        def get_init_label(key, ptype, label_base):
+            path = initial_config.get(key, "")
+            if not path: return label_base
+            path = _clean_path(path)
+            exists = False
+            if ptype == "dir": exists = os.path.isdir(path)
+            elif ptype == "file": exists = os.path.isfile(path)
+            else: exists = os.path.exists(path)
+            return f"✅ {label_base}" if exists else f"❌ {label_base}"
+
         with gr.Tabs() as tabs_root:
-            # ─── 設定 & プレビュー ───
             with gr.Tab(t("tab_settings")):
                 with gr.Row():
                     with gr.Column(scale=1):
                         gr.Markdown(t("h_settings"))
-                        # 言語設定
+
+                        with gr.Group():
+                            with gr.Row():
+                                preset_dropdown = gr.Dropdown(
+                                    label=t("preset_label"),
+                                    choices=["Default"] + list(load_config().get("presets", {}).keys()),
+                                    value="Default",
+                                    scale=2
+                                )
+                                preset_name_input = gr.Textbox(placeholder=t("preset_ph"), label=None, scale=1)
+                            with gr.Row():
+                                save_preset_btn = gr.Button(t("btn_save_preset"), variant="secondary", scale=1)
+                                delete_preset_btn = gr.Button(t("btn_delete_preset"), variant="secondary", scale=0)
+
                         language_selector = gr.Radio(
                             label=t("language_label"),
                             choices=["ja", "en"],
                             value=lambda: load_config().get("language", "ja"),
                         )
                         image_folder = gr.Textbox(
-                            label=t("image_folder"),
+                            label=get_init_label("image_folder", "dir", t("image_folder")),
                             placeholder=t("image_folder_ph"),
                             value=lambda: load_config().get("image_folder", ""),
                         )
                         memo_file = gr.Textbox(
-                            label=t("memo_file"),
+                            label=get_init_label("memo_file", "file", t("memo_file")),
                             placeholder=t("memo_file_ph"),
                             value=lambda: load_config().get("memo_file", ""),
                         )
@@ -1636,6 +1994,11 @@ def on_ui_tabs():
                             minimum=1, maximum=100, step=1,
                             value=lambda: load_config().get("generation_count", 1),
                         )
+                        lora_offset_slider = gr.Slider(
+                            label=t("lora_offset"),
+                            minimum=-1.0, maximum=1.0, step=0.05,
+                            value=lambda: load_config().get("lora_offset", 0.0),
+                        )
                         fallback_enabled = gr.Checkbox(
                             label=t("fallback_enabled"),
                             value=lambda: load_config().get("fallback_enabled", True),
@@ -1644,14 +2007,36 @@ def on_ui_tabs():
                             label=t("auto_lora"),
                             value=lambda: load_config().get("auto_lora_enabled", True),
                         )
+                        with gr.Accordion(t("output_settings"), open=False):
+                            output_sort_selector = gr.Dropdown(
+                                label=t("sort_mode"),
+                                choices=[t("sort_none"), t("sort_preset"), t("sort_section"), t("sort_date")],
+                                value=lambda: load_config().get("output_sort_mode", t("sort_none"))
+                            )
+
+                        with gr.Accordion(t("tab_settings_wildcards"), open=False):
+                            w1_path = gr.Textbox(
+                                label=get_init_label("wildcard_1_path", "any", t("wildcard_1")),
+                                value=lambda: load_config().get("wildcard_1_path", WILD_1_PATH),
+                            )
+                            w2_path = gr.Textbox(
+                                label=get_init_label("wildcard_2_path", "any", t("wildcard_2")),
+                                value=lambda: load_config().get("wildcard_2_path", WILD_2_PATH),
+                            )
+                            w3_path = gr.Textbox(
+                                label=get_init_label("wildcard_3_path", "any", t("wildcard_3")),
+                                value=lambda: load_config().get("wildcard_3_path", WILD_3_PATH),
+                            )
                         with gr.Row():
-                            save_btn = gr.Button(t("btn_save"), variant="primary")
+                            save_btn = gr.Button(t("btn_save"), variant="primary", scale=2)
+                            reload_btn = gr.Button("🔄", variant="secondary", scale=0)
                             preview_btn = gr.Button(t("btn_preview"), variant="secondary")
                         save_status = gr.Textbox(label=t("status"), interactive=False, max_lines=1)
 
                     with gr.Column(scale=1):
                         gr.Markdown(t("h_preview"))
                         preview_image = gr.Image(label=t("selected_image"), type="pil", interactive=False)
+                        # Bug Fix: 変数名を preview_positive / preview_negative に統一
                         preview_positive = gr.Textbox(label=t("positive_prompt"), interactive=False, lines=3)
                         preview_negative = gr.Textbox(label=t("negative_prompt"), interactive=False, lines=2)
                         preview_log = gr.Textbox(label=t("log"), interactive=False, lines=6)
@@ -1672,11 +2057,10 @@ def on_ui_tabs():
                             placeholder=t("section_ph"),
                             info=t("section_info"),
                         )
-                        # --- アコーディオン化されたタグカテゴリ ---
                         _cat_base = ["cat_composition", "cat_pose", "cat_background", "cat_nature", "cat_lighting", "cat_atmosphere", "cat_meta"]
                         _cat_char = ["cat_char_base", "cat_char_hair", "cat_char_face", "cat_char_clothes"]
                         _cat_nsfw = ["cat_nsfw_action", "cat_nsfw_creature", "cat_nsfw_item", "cat_nsfw_focus", "cat_nsfw_fluids", "cat_nsfw_fetish", "cat_nsfw_clothes_mess", "cat_nsfw_censored"]
-                        
+
                         gr.Markdown(t("h_categories"))
                         with gr.Accordion(t("cat_base"), open=True):
                             gen_cat_base = gr.CheckboxGroup(
@@ -1738,12 +2122,14 @@ def on_ui_tabs():
                         print(f"[Smart Img2Img Composer] Image copypaste binding disabled: {e}")
 
                     with gr.Column(scale=1):
+                        # Bug Fix: t("generated_entry") キーが追加されたため正しく表示される
                         gen_output = gr.Textbox(
                             label=t("generated_entry"),
                             interactive=True,
                             lines=10,
                             info=t("generated_entry_info"),
                         )
+                        # Bug Fix: t("analysis_log") キーが追加されたため正しく表示される
                         gen_log = gr.Textbox(
                             label=t("analysis_log"),
                             interactive=False,
@@ -1760,93 +2146,119 @@ def on_ui_tabs():
                                 interactive=False,
                                 max_lines=1,
                             )
-                        # 内部保持用の隠しコンポーネント
                         hidden_gen_pos = gr.Textbox(visible=False)
                         hidden_gen_neg = gr.Textbox(visible=False)
                         hidden_gen_w = gr.Textbox(visible=False)
                         hidden_gen_h = gr.Textbox(visible=False)
 
-            # ─── 🏷️ LoRAマネージャー ───
+            # ─── LoRAマネージャー ───
             with gr.Tab(t("tab_lora_manager")):
-                def load_lora_list(mgr_type):
+                def get_mgr_path(mgr_label):
+                    config = load_config()
+                    label_to_key = {
+                        t("lora_type_char"): "char",
+                        t("lora_type_sit"): "sit",
+                        t("wildcard_1"): "w1",
+                        t("wildcard_2"): "w2",
+                        t("wildcard_3"): "w3",
+                    }
+                    mgr_key = label_to_key.get(mgr_label, "char")
                     mapping = {
                         "char": LORA_CHAR_PATH,
                         "sit": LORA_SIT_PATH,
-                        "w1": WILD_1_PATH,
-                        "w2": WILD_2_PATH,
-                        "w3": WILD_3_PATH,
+                        "w1": config.get("wildcard_1_path") or WILD_1_PATH,
+                        "w2": config.get("wildcard_2_path") or WILD_2_PATH,
+                        "w3": config.get("wildcard_3_path") or WILD_3_PATH,
                     }
-                    path = mapping.get(mgr_type)
+                    res = mapping.get(mgr_key)
+                    if not res:
+                        print(f"[Smart Img2Img Composer] Manager path resolution failed for: {mgr_key}")
+                    else:
+                        print(f"[Smart Img2Img Composer] Manager path resolved ({mgr_key}): {res}")
+                    return res
+
+                def load_lora_list(mgr_label):
+                    if mgr_label is None:
+                        return gr.update()
+                    path = get_mgr_path(mgr_label)
                     if path and os.path.exists(path):
-                        with open(path, "r", encoding="utf-8") as f:
-                            return f.read()
+                        try:
+                            with open(path, "r", encoding="utf-8") as f:
+                                return f.read()
+                        except UnicodeDecodeError:
+                            try:
+                                with open(path, "r", encoding="utf-8-sig") as f:
+                                    return f.read()
+                            except Exception:
+                                with open(path, "r", encoding="cp932", errors="ignore") as f:
+                                    return f.read()
+                        except Exception:
+                            pass
                     return ""
 
-                def save_lora_list(mgr_type, content):
-                    mapping = {
-                        "char": LORA_CHAR_PATH,
-                        "sit": LORA_SIT_PATH,
-                        "w1": WILD_1_PATH,
-                        "w2": WILD_2_PATH,
-                        "w3": WILD_3_PATH,
-                    }
-                    path = mapping.get(mgr_type)
+                def load_lora_with_baseline(mgr_label):
+                    content = load_lora_list(mgr_label)
+                    if mgr_label is None:
+                        return gr.update(), gr.update()
+                    return content, content
+
+                def save_lora_list(mgr_label, content):
+                    path = get_mgr_path(mgr_label)
                     if path:
+                        dir_name = os.path.dirname(path)
+                        if dir_name:
+                            os.makedirs(dir_name, exist_ok=True)
                         with open(path, "w", encoding="utf-8") as f:
                             f.write(content)
-                        return t("msg_lora_saved")
-                    return "Error"
+                        return t("msg_lora_saved"), content
+                    return "Error", gr.update()
 
-                def append_lora_list(mgr_type, input_text):
+                def append_lora_list(mgr_label, input_text):
                     if not input_text or not input_text.strip():
-                        return load_lora_list(mgr_type), ""
-                    
-                    mapping = {
-                        "char": LORA_CHAR_PATH,
-                        "sit": LORA_SIT_PATH,
-                        "w1": WILD_1_PATH,
-                        "w2": WILD_2_PATH,
-                        "w3": WILD_3_PATH,
-                    }
-                    path = mapping.get(mgr_type)
+                        content = load_lora_list(mgr_label)
+                        return content, "", content
+
+                    path = get_mgr_path(mgr_label)
                     if not path:
-                        return "Error", ""
-                    
-                    # 既存の内容を確認し、改行が必要か判断する
+                        return "Error: Path not defined", ""
+
                     current_content = ""
                     if os.path.exists(path):
-                        with open(path, "r", encoding="utf-8") as f:
-                            current_content = f.read()
-                    
+                        try:
+                            with open(path, "r", encoding="utf-8") as f:
+                                current_content = f.read()
+                        except UnicodeDecodeError:
+                            with open(path, "r", encoding="cp932", errors="ignore") as f:
+                                current_content = f.read()
+                        except Exception:
+                            pass
+
                     new_line = input_text.strip()
-                    # 末尾が改行で終わっていない場合は改行を足す
                     if current_content and not current_content.endswith("\n"):
                         current_content += "\n"
-                    
                     current_content += new_line + "\n"
-                    
+
                     with open(path, "w", encoding="utf-8") as f:
                         f.write(current_content)
-                    
-                    return current_content, "" # 最新リストを返し、入力欄を空にする
+
+                    return current_content, "", current_content
 
                 gr.Markdown(t("lora_manager_desc"))
-                
+
                 with gr.Row():
                     lora_mgr_type = gr.Dropdown(
                         label=t("lora_type"),
                         choices=[
-                            (t("lora_type_char"), "char"), 
-                            (t("lora_type_sit"), "sit"),
-                            (t("wildcard_1"), "w1"),
-                            (t("wildcard_2"), "w2"),
-                            (t("wildcard_3"), "w3"),
+                            t("lora_type_char"),
+                            t("lora_type_sit"),
+                            t("wildcard_1"),
+                            t("wildcard_2"),
+                            t("wildcard_3"),
                         ],
-                        value="char"
+                        value=lambda: t("lora_type_char")
                     )
-                
+
                 with gr.Row():
-                    # １個ずつ追加するための入力エリア
                     lora_mgr_input = gr.Textbox(
                         label=t("lora_input_label"),
                         placeholder="<lora:my_lora:0.8>, 1girl, ...",
@@ -1858,31 +2270,96 @@ def on_ui_tabs():
                     label=t("lora_list_label"),
                     lines=15,
                     placeholder="<lora:my_lora:0.8>, 1girl, ...",
-                    value=lambda: load_lora_list("char"),
+                    value=lambda: load_lora_list(t("lora_type_char")),
                     elem_id="smart_composer_lora_mgr_content"
                 )
-                
+                lora_mgr_baseline = gr.Textbox(
+                    value=lambda: load_lora_list(t("lora_type_char")),
+                    visible=False,
+                    elem_id="smart_composer_lora_baseline"
+                )
+
+                # JavaScript for unsaved changes warning
+                gr.HTML(f"""
+                    <script>
+                    function handle_lora_type_change(type, content, baseline) {{
+                        if (content !== baseline) {{
+                            if (!confirm("{t('lora_unsaved_warning')}")) {{
+                                return [null, content, baseline];
+                            }}
+                        }}
+                        return [type, content, baseline];
+                    }}
+                    </script>
+                """)
+
                 with gr.Row():
                     save_lora_mgr_btn = gr.Button(t("btn_save_lora_list"), variant="primary")
                     lora_mgr_msg = gr.Markdown("")
 
-                # イベント
-                lora_mgr_type.change(fn=load_lora_list, inputs=[lora_mgr_type], outputs=[lora_mgr_content])
-                save_lora_mgr_btn.click(fn=save_lora_list, inputs=[lora_mgr_type, lora_mgr_content], outputs=[lora_mgr_msg])
-                append_lora_btn.click(fn=append_lora_list, inputs=[lora_mgr_type, lora_mgr_input], outputs=[lora_mgr_content, lora_mgr_input])
+                lora_mgr_type.change(
+                    fn=load_lora_with_baseline,
+                    inputs=[lora_mgr_type, lora_mgr_content, lora_mgr_baseline],
+                    outputs=[lora_mgr_content, lora_mgr_baseline],
+                    _js="handle_lora_type_change"
+                )
+                save_lora_mgr_btn.click(
+                    fn=save_lora_list,
+                    inputs=[lora_mgr_type, lora_mgr_content],
+                    outputs=[lora_mgr_msg, lora_mgr_baseline]
+                )
+                append_lora_btn.click(
+                    fn=append_lora_list,
+                    inputs=[lora_mgr_type, lora_mgr_input],
+                    outputs=[lora_mgr_content, lora_mgr_input, lora_mgr_baseline]
+                )
 
             # ─── 使い方 ───
             with gr.Tab(t("tab_usage")):
                 gr.Markdown(t("usage_md"))
 
-        # ─── イベントハンドラ (すべてのコンポーネント定義後に記述) ───
+        # ─── イベントハンドラ ───
+
+        _health_inputs = [image_folder, memo_file, w1_path, w2_path, w3_path]
+        _preset_inputs = [
+            language_selector, image_folder, memo_file, match_threshold, generation_count,
+            fallback_enabled, auto_lora_enabled, lora_offset_slider,
+            w1_path, w2_path, w3_path, output_sort_selector
+        ]
+
+        preset_dropdown.change(
+            fn=handle_load_preset,
+            inputs=[preset_dropdown],
+            outputs=_preset_inputs + _health_inputs
+        )
+        save_preset_btn.click(
+            fn=handle_save_preset,
+            inputs=[preset_name_input] + _preset_inputs,
+            outputs=[save_status, preset_dropdown]
+        )
+        delete_preset_btn.click(
+            fn=handle_delete_preset,
+            inputs=[preset_dropdown],
+            outputs=[save_status, preset_dropdown]
+        )
+
+        _common_save_inputs = [
+            language_selector, image_folder, memo_file, match_threshold, generation_count, fallback_enabled, auto_lora_enabled,
+            gen_confidence, gen_positive, gen_negative, gen_custom_dict, gen_cat_base, gen_cat_char, gen_cat_nsfw,
+            w1_path, w2_path, w3_path, lora_offset_slider, output_sort_selector
+        ]
+
+
         save_btn.click(
-            fn=save_all_settings,
-            inputs=[
-                language_selector, image_folder, memo_file, match_threshold, generation_count, fallback_enabled, auto_lora_enabled,
-                gen_confidence, gen_positive, gen_negative, gen_custom_dict, gen_cat_base, gen_cat_char, gen_cat_nsfw
-            ],
-            outputs=[save_status],
+            fn=lambda *args: (save_all_settings(*args), *check_individual_health(*[args[i] for i in [1, 2, 14, 15, 16]])),
+            inputs=_common_save_inputs,
+            outputs=[save_status] + _health_inputs,
+        )
+        # Bug Fix: outputs の変数名を preview_positive / preview_negative に修正
+        reload_btn.click(
+            fn=preview_compose,
+            inputs=[image_folder, memo_file, match_threshold],
+            outputs=[preview_image, preview_positive, preview_negative, preview_log],
         )
         preview_btn.click(
             fn=preview_compose,
@@ -1890,12 +2367,9 @@ def on_ui_tabs():
             outputs=[preview_image, preview_positive, preview_negative, preview_log],
         )
         gen_save_btn.click(
-            fn=save_all_settings,
-            inputs=[
-                language_selector, image_folder, memo_file, match_threshold, generation_count, fallback_enabled, auto_lora_enabled,
-                gen_confidence, gen_positive, gen_negative, gen_custom_dict, gen_cat_base, gen_cat_char, gen_cat_nsfw
-            ],
-            outputs=[gen_save_status],
+            fn=lambda *args: (save_all_settings(*args), *check_individual_health(*[args[i] for i in [1, 2, 14, 15, 16]])),
+            inputs=_common_save_inputs,
+            outputs=[gen_save_status] + _health_inputs,
         )
         append_btn.click(
             fn=lambda entry: append_to_memo(load_config().get("memo_file", ""), entry),
@@ -1907,34 +2381,30 @@ def on_ui_tabs():
             inputs=[gen_image, gen_section, gen_confidence, gen_positive, gen_negative, gen_cat_base, gen_cat_char, gen_cat_nsfw, gen_custom_dict],
             outputs=[gen_output, gen_log, hidden_gen_pos, hidden_gen_neg, hidden_gen_w, hidden_gen_h],
         )
-        
+
         send_to_img2img_btn.click(
             fn=None,
             _js="""
             function(pos, neg, w, h) {
-                var pos_elem = gradioApp().querySelector('#img2img_prompt textarea');
-                if (pos_elem) {
-                    pos_elem.value = pos;
-                    updateInput(pos_elem);
-                }
-                var neg_elem = gradioApp().querySelector('#img2img_neg_prompt textarea');
-                if (neg_elem) {
-                    neg_elem.value = neg;
-                    updateInput(neg_elem);
-                }
+                const q = (sel) => gradioApp().querySelector(sel);
+                const setVal = (sel, val) => {
+                    let el = q(sel);
+                    if(el) { el.value = val; updateInput(el); }
+                };
+
+                setVal('#img2img_prompt textarea', pos);
+                setVal('#img2img_neg_prompt textarea', neg);
+
                 if (w && h) {
-                    var w_num = gradioApp().querySelector('#img2img_width input[type="number"]');
-                    var w_range = gradioApp().querySelector('#img2img_width input[type="range"]');
-                    if (w_num) { w_num.value = w; updateInput(w_num); }
-                    if (w_range) { w_range.value = w; updateInput(w_range); }
-                    var h_num = gradioApp().querySelector('#img2img_height input[type="number"]');
-                    var h_range = gradioApp().querySelector('#img2img_height input[type="range"]');
-                    if (h_num) { h_num.value = h; updateInput(h_num); }
-                    if (h_range) { h_range.value = h; updateInput(h_range); }
+                    ['input[type="number"]', 'input[type="range"]'].forEach(sel => {
+                        setVal('#img2img_width ' + sel, w);
+                        setVal('#img2img_height ' + sel, h);
+                    });
                 }
-                var tabs = gradioApp().querySelectorAll('#tabs > div > button');
-                if (tabs && tabs.length > 0) {
-                    for(var i=0; i<tabs.length; i++){
+
+                const tabs = gradioApp().querySelectorAll('#tabs > div > button');
+                if (tabs) {
+                    for(let i=0; i<tabs.length; i++){
                         if(tabs[i].innerText.includes('img2img')) {
                             tabs[i].click();
                             break;
@@ -1949,5 +2419,6 @@ def on_ui_tabs():
         )
 
     return [(tab, "Smart Img2Img Composer", "smart_composer_tabs_root")]
+
 
 script_callbacks.on_ui_tabs(on_ui_tabs)

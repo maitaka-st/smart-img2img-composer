@@ -24,7 +24,11 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 - **automatic LoRA injection support**: Configure `lora:` blocks in your memo file, which automatically injects `<lora:name:weight>` only if the LoRA is actually installed.
 - **Complete Internationalization (i18n)**: All UI elements support English and Japanese.
 - **Auto-Prompt Generation (WD14 Tagger Integration)**: Analyze images and generate prompts automatically.
-- **Injection Stability (v2.2.1)**: Reliable prompt injection that works with batch generation. Includes high-precision fuzzy matching (`difflib`) for filename-tag linking and performance caching for faster i18n/regex processing.
+- **v2.3.2**: **Path Quoting Support** (`strip('"')`) and **Debug Logging** for prompt loading.
+- **v2.3.1**: Hotfix for `get_random_asset` and manager connectivity.
+- **v2.3.0**: **Custom Wildcard Paths** (flexible asset files) and **UI nesting** (nested accordion).
+- **v2.2.1**: Bug fixes for `autogen_prompt`, fuzzy matching accuracy, and performance caching.
+ for faster i18n/regex processing.
 - **Smart Matching**: Selects the single best-matching prompt based on filename similarity score.
 - **Tag Deduplication**: Automatically cleans up redundant tags in the final prompt.
 - **Integrated Prompt & LoRA Manager (v2.2.0)**: Use up to 5 random slots (Character, Situation, and 3 Wildcards) with **Front/Back position toggles**. Manage your lists easily in a dedicated tab.
