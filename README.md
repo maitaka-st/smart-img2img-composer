@@ -24,11 +24,11 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 - **automatic LoRA injection support**: Configure `lora:` blocks in your memo file, which automatically injects `<lora:name:weight>` only if the LoRA is actually installed.
 - **Complete Internationalization (i18n)**: All UI elements support English and Japanese.
 - **Auto-Prompt Generation (WD14 Tagger Integration)**: Analyze images and generate prompts automatically.
-- **Injection Stability (v2.1.2)**: Reliable prompt injection that works with batch generation and various WebUI versions.
+- **Injection Stability (v2.2.0)**: Reliable prompt injection that works with batch generation. Every image in a batch gets unique random tags!
 - **Smart Matching**: Selects the single best-matching prompt based on filename similarity score.
 - **Tag Deduplication**: Automatically cleans up redundant tags in the final prompt.
-- **Integrated Prompt & LoRA Manager (v2.1.5)**: Register and manage lists of your favorite Character/Situation prompts and LoRAs. Each line is picked randomly, providing a built-in "Wildcard" functionality.
-- **Smart Extension Compatibility**: Runs at high priority (`-100`) to be compatible with other scripts like Dynamic Prompts. (Tip: Turn OFF 'Overwrite Prompt' if you want to use manual wildcards in the main WebUI box).
+- **Integrated Prompt & LoRA Manager (v2.2.0)**: Use up to 5 random slots (Character, Situation, and 3 Wildcards) with **Front/Back position toggles**. Manage your lists easily in a dedicated tab.
+- **Smart Extension Compatibility**: Runs at high priority (`-100`). (Tip: Turn OFF 'Overwrite Prompt' if you want to use manual wildcards in the main WebUI box).
 - **Consolidated Settings**: All configurations are persisted to `config.json` and persist across browser reloads.
 - **Custom Dictionary**: Map specific tags or WD14 results to your own custom phrases.
 

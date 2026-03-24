@@ -24,7 +24,13 @@ from modules import script_callbacks, processing, scripts
 # ======================================================================
 
 EXTENSION_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(EXTENSION_DIR, "config.json")
+LORA_CHAR_PATH = os.path.join(BASE_DIR, "lora_char.txt")
+LORA_SIT_PATH = os.path.join(BASE_DIR, "lora_sit.txt")
+WILD_1_PATH = os.path.join(BASE_DIR, "wildcard_1.txt")
+WILD_2_PATH = os.path.join(BASE_DIR, "wildcard_2.txt")
+WILD_3_PATH = os.path.join(BASE_DIR, "wildcard_3.txt")
 
 DEFAULT_CONFIG = {
     "image_folder": "",
@@ -63,6 +69,12 @@ _I18N = {
         "en": "✅ Enable (Auto-inject image & prompt)",
         "ja": "✅ 有効化（生成時に自動で画像＋プロンプト投入）",
     },
+    "pos_label": {"en": "Pos", "ja": "位置"},
+    "pos_front": {"en": "Front", "ja": "前"},
+    "pos_back": {"en": "Back", "ja": "後"},
+    "wildcard_1": {"en": "Wildcard 1", "ja": "ワイルドカード1"},
+    "wildcard_2": {"en": "Wildcard 2", "ja": "ワイルドカード2"},
+    "wildcard_3": {"en": "Wildcard 3", "ja": "ワイルドカード3"},
     "selection_mode": {
         "en": "🖼️ Image Selection Mode",
         "ja": "🖼️ 画像の選択モード",
@@ -1358,18 +1370,25 @@ class RandomComposerScript(scripts.Script):
                 value=False,
                 elem_id="smart_composer_enabled",
             )
-            with gr.Row():
-                enable_random_char = gr.Checkbox(
-                    label=t("enable_random_char"),
-                    value=False,
-                    elem_id="smart_composer_random_char",
-                )
-                enable_random_sit = gr.Checkbox(
-                    label=t("enable_random_sit"),
-                    value=False,
-                    elem_id="smart_composer_random_sit",
-                )
-            # 画像選択モード: 内部キー "random" / "sequential" を使い、表示は翻訳
+            # アセット設定
+            with gr.Column():
+                with gr.Row():
+                    en_char = gr.Checkbox(label=t("enable_random_char"), value=False, elem_id="smart_composer_en_char")
+                    pos_char = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                with gr.Row():
+                    en_sit = gr.Checkbox(label=t("enable_random_sit"), value=False, elem_id="smart_composer_en_sit")
+                    pos_sit = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                with gr.Row():
+                    en_w1 = gr.Checkbox(label=t("wildcard_1"), value=False, elem_id="smart_composer_en_w1")
+                    pos_w1 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                with gr.Row():
+                    en_w2 = gr.Checkbox(label=t("wildcard_2"), value=False, elem_id="smart_composer_en_w2")
+                    pos_w2 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+                with gr.Row():
+                    en_w3 = gr.Checkbox(label=t("wildcard_3"), value=False, elem_id="smart_composer_en_w3")
+                    pos_w3 = gr.Radio(choices=[t("pos_front"), t("pos_back")], label=t("pos_label"), value=t("pos_back"), scale=0)
+
+            # 画像選択モード
             _sel_choices = [(t("sel_random"), "random"), (t("sel_sequential"), "sequential")]
             selection_mode = gr.Radio(
                 label=t("selection_mode"),
@@ -1382,7 +1401,7 @@ class RandomComposerScript(scripts.Script):
                 value=True,
                 elem_id="smart_composer_override",
             )
-            # リサイズモード: 内部判定はインデックスで行う
+            # リサイズモード
             _resize_choices = [
                 t("resize_none"),
                 t("resize_slider"),
@@ -1396,15 +1415,16 @@ class RandomComposerScript(scripts.Script):
                 value=_resize_choices[0],
                 elem_id="smart_composer_resize_mode",
             )
+
             base_resolution = gr.Slider(
                 label=t("base_resolution"),
                 minimum=512, maximum=2048, step=64,
                 value=1024,
                 elem_id="smart_composer_base_resolution",
             )
-        return [enabled, override_prompt, resize_mode, base_resolution, selection_mode, enable_random_char, enable_random_sit]
+        return [enabled, override_prompt, resize_mode, base_resolution, selection_mode, en_char, pos_char, en_sit, pos_sit, en_w1, pos_w1, en_w2, pos_w2, en_w3, pos_w3]
 
-    def process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="", base_resolution=1024, selection_mode="", enable_random_char=False, enable_random_sit=False):
+    def process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode, base_resolution, selection_mode, en_char, pos_char, en_sit, pos_sit, en_w1, pos_w1, en_w2, pos_w2, en_w3, pos_w3):
         """process メソッドでプロンプト注入を行う。
         getattr(p, '_smart_composer_processed', False) を使って二重実行を防止する。
         """
@@ -1425,34 +1445,22 @@ class RandomComposerScript(scripts.Script):
         
         log_list = [log] if log else []
 
-        # ランダムLoRAの読み込みと注入
-        def get_random_lora(filename):
-            path = os.path.join(EXTENSION_DIR, filename)
+        # アセット設定の準備（各スロットの設定をタプル化）
+        asset_slots = [
+            (en_char, LORA_CHAR_PATH, pos_char, "Char"),
+            (en_sit, LORA_SIT_PATH, pos_sit, "Sit"),
+            (en_w1, WILD_1_PATH, pos_w1, "W1"),
+            (en_w2, WILD_2_PATH, pos_w2, "W2"),
+            (en_w3, WILD_3_PATH, pos_w3, "W3"),
+        ]
+
+        def get_random_asset(path):
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     lines = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
                 if lines:
                     return random.choice(lines)
             return None
-
-        additional_prompts = []
-        if enable_random_char:
-            lora = get_random_lora("lora_char.txt")
-            if lora:
-                additional_prompts.append(lora)
-                log_list.append(t("log_random_lora").format(lora=lora))
-        
-        if enable_random_sit:
-            lora = get_random_lora("lora_sit.txt")
-            if lora:
-                additional_prompts.append(lora)
-                log_list.append(t("log_random_lora").format(lora=lora))
-        
-        if additional_prompts:
-            if positive:
-                positive = f"{positive}, {', '.join(additional_prompts)}"
-            else:
-                positive = ", ".join(additional_prompts)
 
         # 内部的な生成回数（Batch count）の設定
         generation_count = config.get("generation_count", 1)
@@ -1490,13 +1498,13 @@ class RandomComposerScript(scripts.Script):
                     min_v, max_v = 1024, 1536
                     s_val = int(base_resolution) if base_resolution else 1024
                     
-                    if resize_idx == 2:  # 512~1024
+                    if resize_idx == 2: # 512~1024
                         mode_flag = "range"
                         min_v, max_v = 512, 1024
-                    elif resize_idx == 3:  # 1024~1536
+                    elif resize_idx == 3: # 1024~1536
                         mode_flag = "range"
                         min_v, max_v = 1024, 1536
-                    elif resize_idx == 4:  # 1536~1792
+                    elif resize_idx == 4: # 1536~1792
                         mode_flag = "range"
                         min_v, max_v = 1536, 1792
                         
@@ -1506,28 +1514,68 @@ class RandomComposerScript(scripts.Script):
             except Exception as e:
                 print(f"[Smart Img2Img Composer] 画像読み込み失敗: {selected}, Error: {e}")
 
-        # プロンプトの注入（p.prompt だけでなく all_prompts も更新する）
+        # プロンプトの注入用の定義
         def inject(current_val, new_val, override):
             if override:
                 return new_val
             return f"{current_val}, {new_val}" if current_val else new_val
 
-        if positive:
-            p.prompt = inject(p.prompt, positive, override_prompt)
-            if hasattr(p, "all_prompts") and p.all_prompts:
-                p.all_prompts = [inject(x, positive, override_prompt) for x in p.all_prompts]
+        # プロンプトの注入（p.prompt だけでなく all_prompts も更新する）
+        if hasattr(p, "all_prompts") and p.all_prompts:
+            new_prompts = []
+            first_img_asset_log = []
+            
+            for i, original_v in enumerate(p.all_prompts):
+                working_p = original_v
+                # 1. メモファイルのプロンプト
+                if positive:
+                    working_p = inject(working_p, positive, override_prompt)
+                
+                # 2. 個別ランダムアセット
+                f_assets = []
+                b_assets = []
+                img_logs = []
+                for en, path, pos, name in asset_slots:
+                    if en:
+                        line = get_random_asset(path)
+                        if line:
+                            if pos == t("pos_front"):
+                                f_assets.insert(0, line)
+                            else:
+                                b_assets.append(line)
+                            img_logs.append(f"{name}: {line}")
+                
+                # 合成: Front + Working + Back
+                parts = []
+                if f_assets:
+                    parts.append(", ".join(f_assets))
+                parts.append(working_p)
+                if b_assets:
+                    parts.append(", ".join(b_assets))
+                
+                final_p = _clean_prompt(", ".join(parts))
+                new_prompts.append(final_p)
+                
+                if i == 0:
+                    first_img_asset_log = img_logs
 
+            p.all_prompts = new_prompts
+            if new_prompts:
+                p.prompt = new_prompts[0]
+            if first_img_asset_log:
+                log_list.append(f"🎲 Random Assets: {' | '.join(first_img_asset_log)}")
+
+        # ネガティブプロンプトの注入
         if negative:
             p.negative_prompt = inject(p.negative_prompt, negative, override_prompt)
             if hasattr(p, "all_negative_prompts") and p.all_negative_prompts:
                 p.all_negative_prompts = [inject(x, negative, override_prompt) for x in p.all_negative_prompts]
 
-        final_log = "\n".join(log_list)
-        print(f"[Smart Img2Img Composer]\n{final_log}")
+        p._smart_composer_processed = True
         
-        # 実行済みフラグをセット
-        setattr(p, "_smart_composer_processed", True)
-
+        final_log = "\n".join(log_list)
+        if final_log:
+            print(f"[Smart Img2Img Composer]\n{final_log}")
 
 # ======================================================================
 # 独立タブ UI
@@ -1538,7 +1586,7 @@ def on_ui_tabs():
 
     with gr.Blocks(analytics_enabled=False) as tab:
         gr.Markdown(
-            "# 🎲 Smart Img2Img Composer\n"
+            "# 🎲 Smart Img2Img Composer (v2.2.0)\n"
             + t("tab_header")
         )
 
@@ -1707,26 +1755,48 @@ def on_ui_tabs():
             # ─── 🏷️ LoRAマネージャー ───
             with gr.Tab(t("tab_lora_manager")):
                 def load_lora_list(mgr_type):
-                    filename = "lora_char.txt" if mgr_type == "char" else "lora_sit.txt"
-                    path = os.path.join(EXTENSION_DIR, filename)
-                    if os.path.exists(path):
+                    mapping = {
+                        "char": LORA_CHAR_PATH,
+                        "sit": LORA_SIT_PATH,
+                        "w1": WILD_1_PATH,
+                        "w2": WILD_2_PATH,
+                        "w3": WILD_3_PATH,
+                    }
+                    path = mapping.get(mgr_type)
+                    if path and os.path.exists(path):
                         with open(path, "r", encoding="utf-8") as f:
                             return f.read()
                     return ""
 
                 def save_lora_list(mgr_type, content):
-                    filename = "lora_char.txt" if mgr_type == "char" else "lora_sit.txt"
-                    path = os.path.join(EXTENSION_DIR, filename)
-                    with open(path, "w", encoding="utf-8") as f:
-                        f.write(content)
-                    return t("msg_lora_saved")
+                    mapping = {
+                        "char": LORA_CHAR_PATH,
+                        "sit": LORA_SIT_PATH,
+                        "w1": WILD_1_PATH,
+                        "w2": WILD_2_PATH,
+                        "w3": WILD_3_PATH,
+                    }
+                    path = mapping.get(mgr_type)
+                    if path:
+                        with open(path, "w", encoding="utf-8") as f:
+                            f.write(content)
+                        return t("msg_lora_saved")
+                    return "Error"
 
                 def append_lora_list(mgr_type, input_text):
                     if not input_text or not input_text.strip():
                         return load_lora_list(mgr_type), ""
                     
-                    filename = "lora_char.txt" if mgr_type == "char" else "lora_sit.txt"
-                    path = os.path.join(EXTENSION_DIR, filename)
+                    mapping = {
+                        "char": LORA_CHAR_PATH,
+                        "sit": LORA_SIT_PATH,
+                        "w1": WILD_1_PATH,
+                        "w2": WILD_2_PATH,
+                        "w3": WILD_3_PATH,
+                    }
+                    path = mapping.get(mgr_type)
+                    if not path:
+                        return "Error", ""
                     
                     # 既存の内容を確認し、改行が必要か判断する
                     current_content = ""
@@ -1749,9 +1819,15 @@ def on_ui_tabs():
                 gr.Markdown(t("lora_manager_desc"))
                 
                 with gr.Row():
-                    lora_mgr_type = gr.Radio(
+                    lora_mgr_type = gr.Dropdown(
                         label=t("lora_type"),
-                        choices=[(t("lora_type_char"), "char"), (t("lora_type_sit"), "sit")],
+                        choices=[
+                            (t("lora_type_char"), "char"), 
+                            (t("lora_type_sit"), "sit"),
+                            (t("wildcard_1"), "w1"),
+                            (t("wildcard_2"), "w2"),
+                            (t("wildcard_3"), "w3"),
+                        ],
                         value="char"
                     )
                 
