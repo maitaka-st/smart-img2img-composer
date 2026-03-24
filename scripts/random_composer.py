@@ -24,6 +24,11 @@ import difflib
 import gradio as gr
 from PIL import Image
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 from modules import script_callbacks, processing, scripts
 
 # ======================================================================
@@ -1305,14 +1310,55 @@ _TAG_CATEGORIES = {
 }
 
 
+def _get_easy_prompt_tags():
+    """sdweb-easy-prompt-selector のタグフォルダから全タグを取得する"""
+    tags = set()
+    # デフォルトのインストールパスを想定
+    easy_prompt_dir = os.path.join(os.path.dirname(EXTENSION_DIR), "sdweb-easy-prompt-selector", "tags")
+    if not os.path.exists(easy_prompt_dir):
+        # ユーザーが指定した絶対パス（もしあれば、将来的に設定可能にする）
+        easy_prompt_dir = r"C:\StableDiffusion\stable-diffusion-webui\extensions\sdweb-easy-prompt-selector\tags"
+    
+    if not os.path.exists(easy_prompt_dir) or yaml is None:
+        return tags
+
+    try:
+        for root, _, files in os.walk(easy_prompt_dir):
+            for file in files:
+                if file.endswith((".yml", ".yaml")):
+                    try:
+                        with open(os.path.join(root, file), "r", encoding="utf-8") as f:
+                            data = yaml.safe_load(f)
+                            if isinstance(data, dict):
+                                def extract_values(d):
+                                    for v in d.values():
+                                        if isinstance(v, list):
+                                            for item in v:
+                                                if isinstance(item, str):
+                                                    # LoRAやWildcardは除外
+                                                    if not item.startswith(("<lora:", "__")):
+                                                        tags.add(item.strip().lower().replace(" ", "_"))
+                                        elif isinstance(v, dict):
+                                            extract_values(v)
+                                extract_values(data)
+                    except Exception:
+                        continue
+    except Exception as e:
+        print(f"[Smart Img2Img Composer] EasyPrompt load error: {e}")
+    return tags
+
+
 _compiled_cat_patterns = {}
 
 
-def _filter_tags(tags: dict, confidence_threshold: float = 0.35, selected_categories=None) -> dict:
+def _filter_tags(tags: dict, confidence_threshold: float = 0.35, selected_categories=None, protect_easy_prompts: bool = True) -> dict:
     """許可タグカテゴリに含まれるタグのみ残すフィルタ (正規表現をキャッシュ)"""
     global _compiled_cat_patterns
     if selected_categories is None:
         selected_categories = list(_TAG_CATEGORIES.keys())
+
+    # EasyPromptのタグを取得
+    easy_tags = _get_easy_prompt_tags() if protect_easy_prompts else set()
 
     cache_key = tuple(sorted(selected_categories))
     if cache_key in _compiled_cat_patterns:
@@ -1335,6 +1381,11 @@ def _filter_tags(tags: dict, confidence_threshold: float = 0.35, selected_catego
             continue
 
         tag_clean = tag.strip().lower().replace(" ", "_")
+
+        # EasyPrompt に含まれるタグは無条件で残す (LoRA/Wildcard以外)
+        if protect_easy_prompts and tag_clean in easy_tags:
+            filtered[tag_clean] = score
+            continue
 
         if tag_clean in allowed_tags:
             filtered[tag_clean] = score

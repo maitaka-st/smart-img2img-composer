@@ -14,18 +14,26 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 ![Workflow Diagram](docs/images/workflow_diagram.png)
 
 ## ✨ Features
-- **Flexible image selection**: Automatically picks an image from your specified input folder for img2img. Supports both "Random" selection and "Sequential" selection (one by one in alphabetical order, retaining index progress across reloads).
-- **Filename-based prompt matching**: Matches the filename (either exact or partial match based on threshold) to a prompt block in your memo file.
-- **Auto-resize dimension optimization**: Automatically scales images while maintaining aspect ratio, with a customizable base resolution slider (512px - 2048px) depending on your model (e.g., SD1.5 or SDXL/Illustrious).
-- **positive / negative prompt support**: Supports writing distinct positive and negative prompts in the memo file.
-- **WD14 Tagger integration**: Built-in tab to auto-generate prompts from reference images using WD14 Tagger, with smart category filtering.
-- **Conditional prompt injection system**: Define custom dictionary rules to automatically inject stylistic tags when certain trigger words are found.
-- **Fallback prompt support**: Automatically falls back to a `[default]` section if the image name doesn't match any specific block.
-- **Automatic LoRA injection support**: Configure `lora:` blocks in your memo file, which automatically injects `<lora:name:weight>` only if the LoRA is actually installed.
-- **Preset Management (v2.4.0)**: Save and load multiple configurations (folders, thresholds, etc.) to quickly switch between different workflows.
-- **LoRA Weight Global Offset (v2.4.1)**: Fine-tune all LoRA weights in a preset at once with a single slider.
-- **Automatic Output Sorting (v2.4.1)**: Automatically sort generated images into subfolders by Preset Name, Section Name, or Date.
-- **Complete Internationalization (i18n)**: All UI elements support English and Japanese.
+### 🧩 Generation & Preset Management
+1.  **Automatic image & prompt selection**: Automatically selects an image from your folder and matches it with the corresponding prompt from your memo file.
+2.  **Preset Management (v2.4.0)**: Save and load multiple configurations (folders, thresholds, etc.) to quickly switch between different workflows.
+3.  **Auto-resize dimension optimization**: Automatically scales images while maintaining aspect ratio (512px - 2048px).
+4.  **Automatic Output Sorting (v2.4.1)**: Automatically sort generated images into subfolders by Preset Name, Section Name, or Date.
+5.  **Consolidated Settings**: All configurations are persisted to `config.json` and persist across browser reloads.
+
+### 🔍 Prompt Analysis & Auto-Generation
+6.  **Auto-Prompt Generation**: Built-in tab to analyze images and generate prompts using WD14 Tagger integration.
+7.  **Refined Health Check (v2.4.2)**: Localized **✅/❌ icons** next to each path input for real-time validation.
+8.  **Smart Matching**: Selects the single best-matching prompt based on filename similarity and cleans up redundant tags.
+9.  **Conditional prompt injection**: Define custom dictionary rules to automatically inject stylistic tags when certain trigger words are found.
+10. **Fallback prompt support**: Automatically falls back to a `[default]` section if no match is found.
+
+### ⚙️ Adjustment & Flexible Customization
+11. **LoRA Weight Global Offset (v2.4.1)**: Fine-tune all LoRA weights in a preset at once with a single slider.
+12. **Integrated Prompt & LoRA Manager**: Manage up to 5 random slots (Character, Situation, and 3 Wildcards) with **Front/Back position toggles**.
+13. **Complete Internationalization (i18n)**: All UI elements support English and Japanese.
+## 📜 Version History
+
 - **v2.4.2**: **Refined Health Check** (localized ✅/❌ icons), **UI Stability Fixes** (Gradio crash fix), and updated manual.
 - **v2.4.1**: **LoRA Global Offset**, **Output Sorting**, and bug fixes for folder paths.
 - **v2.4.0**: **Preset System** (Save/Load configurations) and UI/UX overhaul.
@@ -33,13 +41,6 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 - **v2.3.1**: Hotfix for `get_random_asset` and manager connectivity.
 - **v2.3.0**: **Custom Wildcard Paths** (flexible asset files) and **UI nesting** (nested accordion).
 - **v2.2.1**: Bug fixes for `autogen_prompt`, fuzzy matching accuracy, and performance caching.
- for faster i18n/regex processing.
-- **Smart Matching**: Selects the single best-matching prompt based on filename similarity score.
-- **Tag Deduplication**: Automatically cleans up redundant tags in the final prompt.
-- **Integrated Prompt & LoRA Manager (v2.2.0)**: Use up to 5 random slots (Character, Situation, and 3 Wildcards) with **Front/Back position toggles**. Manage your lists easily in a dedicated tab.
-- **Smart Extension Compatibility**: Runs at high priority (`-100`). (Tip: Turn OFF 'Overwrite Prompt' if you want to use manual wildcards in the main WebUI box).
-- **Consolidated Settings**: All configurations are persisted to `config.json` and persist across browser reloads.
-- **Custom Dictionary**: Map specific tags or WD14 results to your own custom phrases.
 
 ## 📸 Screenshots
 
@@ -80,21 +81,22 @@ You can also toggle auto-resizing and configure the base resolution via a slider
 1. Go to the "**🎲 Smart Composer**" tab, open the "⚙️ Settings & Preview" section.
 2. Enter your "Image Folder" and "Memo File" paths, then click **Save**.
 
-### 2. Enable in img2img
-1. Go to the **img2img** tab.
-2. Expand the "**🎲 Smart Composer**" accordion at the bottom and check "**Enable**".
-3. Press the Generate button. The extension will randomly swap the source image and automatically inject the paired prompts.
-
-### 3. Register LoRAs in LoRA Manager
+### 2. Register LoRAs in LoRA Manager
 1. Go to the "**🏷️ LoRA Manager**" tab.
 2. Select "Character" or "Situation" and enter your LoRA trigger (e.g., `<lora:my_character:0.8>, 1girl`) in the **"Add one by one"** form, then click "➕ Append to List". It will be added to the end of the file with a newline.
 3. Alternatively, you can edit the entire list in the large text area below and click "💾 Save List".
 4. In the img2img tab's Smart Img2Img Composer accordion, check "**🎲 Random Character LoRA**" etc. A random LoRA from your list will be injected on each generation.
 
+### 3. Enable & Generate in img2img
+1. Go to the **img2img** tab.
+2. Expand the "**🎲 Smart Composer**" accordion at the bottom and check "**Enable**".
+3. Press the Generate button. The extension will automatically swap the source image and inject the paired prompts for each image.
+
 ### 4. Direct file editing (Advanced)
 You can directly edit and save the following files in the extension folder:
 - Character list: `lora_char.txt`
 - Situation list: `lora_sit.txt`
+- Lines starting with `#` are ignored as comments.
 - Lines starting with `#` are ignored as comments.
 
 ---
