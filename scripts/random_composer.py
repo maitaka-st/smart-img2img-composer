@@ -1404,8 +1404,8 @@ class RandomComposerScript(scripts.Script):
             )
         return [enabled, override_prompt, resize_mode, base_resolution, selection_mode, enable_random_char, enable_random_sit]
 
-    def before_process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="", base_resolution=1024, selection_mode="", enable_random_char=False, enable_random_sit=False):
-        """before_process メソッドでプロンプト注入を行う。
+    def process(self, p: processing.StableDiffusionProcessing, enabled, override_prompt, resize_mode="", base_resolution=1024, selection_mode="", enable_random_char=False, enable_random_sit=False):
+        """process メソッドでプロンプト注入を行う。
         getattr(p, '_smart_composer_processed', False) を使って二重実行を防止する。
         """
         if not enabled:
@@ -1458,6 +1458,15 @@ class RandomComposerScript(scripts.Script):
         generation_count = config.get("generation_count", 1)
         if generation_count > p.n_iter:
             p.n_iter = generation_count
+            # n_iter を増やした場合、内部のプロンプトリスト等も拡張しないと2枚目以降が空になる可能性がある
+            if hasattr(p, "all_prompts") and len(p.all_prompts) < p.n_iter:
+                p.all_prompts = [p.prompt] * (p.n_iter * p.batch_size)
+            if hasattr(p, "all_negative_prompts") and len(p.all_negative_prompts) < p.n_iter:
+                p.all_negative_prompts = [p.negative_prompt] * (p.n_iter * p.batch_size)
+            if hasattr(p, "all_seeds") and len(p.all_seeds) < p.n_iter:
+                p.all_seeds = [p.seed] * (p.n_iter * p.batch_size)
+            if hasattr(p, "all_subseeds") and len(p.all_subseeds) < p.n_iter:
+                p.all_subseeds = [p.subseed] * (p.n_iter * p.batch_size)
 
         if selected:
             try:
