@@ -1,17 +1,17 @@
-# 🎲 Smart Img2Img Composer v1.0 (Stable)
+# 🎲 Smart Img2Img Composer v1.0.2 Stable
 
 ![Smart Img2Img Composer Banner](docs/images/hero_banner.png)
 
-### **"Elevate Mass Production to Artistic Excellence."**
-**The Ultimate Batch Generation & Management Solution for YouTube Shorts, TikTok, and Social Media Creators.**
+### **"Mass Production, Met Art Quality."**
+**The ultimate batch generation and management solution for YouTube Shorts, TikTok, and SNS content creators.**
 
-Professional-grade extension for AUTOMATIC1111 Stable Diffusion WebUI. Automate the complex dance between massive image assets and prompts, reducing your creative production time by up to 80%.
+A professional-grade extension for AUTOMATIC1111 Stable Diffusion WebUI. Automate the combination of massive image assets and prompts, reducing creative workload by up to 80%.
 
 ---
 
-## 🌟 v1.0 Stable Highlights
+## 🌟 v1.0.2 Stable Highlights
 
-With the release of v1.0 (Stable), we have fundamentally re-engineered the UI/UX. Beyond just adding features, we focused on "Deterministic Reliability" and "Professional Feel" for high-stakes creative environments.
+In v1.0.2 Stable, we've integrated numerous critical bug fixes and usability enhancements (automatic LoRA template generation, enhanced EasyPrompt search, etc.) on top of the complete UI/UX overhaul.
 
 ### 🎨 Refined Dual-Column Layout
 We introduced a streamlined 2-column architecture: **Configuration on the left**, **Preview on the right**. This ensures that every adjustment is immediately visible, creating a frictionless workflow.
