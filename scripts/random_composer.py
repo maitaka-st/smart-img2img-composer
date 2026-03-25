@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 Random Img2Img Composer
-AUTOMATIC1111 Stable Diffusion WebUI 拡張機能 v1.0 (Stable)
+AUTOMATIC1111 Stable Diffusion WebUI 拡張機能 v1.0 Stable
 
 img2img生成時に、指定フォルダからランダム画像を選択し、
 メモファイルから対応プロンプト（positive/negative）を自動取得して投入する。
 WD14 Tagger連携でプロンプトの自動生成も可能。
 
-【v1.0 修正内容】
-- Release: 正式版 v1.0 リリース
+【v1.0 Stable 修正内容】
+- Release: 正式版 v1.0 Stable リリース
 - UI/UX: 全カテゴリの「一括選択/解除」ボタンを実装
 - UI/UX: 有用性の高い「基本」カテゴリのみアコーディオンをデフォルト開に設定
-- Logic: v2.4.3 までの全修正と安定化ロジックを統合
+- Logic: v2.4.x までの全修正と安定化ロジックを統合 (Official v1.0)
 """
 
 import os
@@ -1820,7 +1820,7 @@ class RandomComposerScript(scripts.Script):
     sorting_priority = -100
 
     def title(self):
-        return "Smart Img2Img Composer v1.0 (Stable)"
+        return "Smart Img2Img Composer v1.0 Stable"
 
     def show(self, is_img2img):
         return scripts.AlwaysVisible if is_img2img else False
@@ -2049,7 +2049,7 @@ def on_ui_tabs():
 
     with gr.Blocks(analytics_enabled=False) as tab:
         gr.Markdown(
-            "# 🎲 Smart Img2Img Composer v1.0 (Stable)\n"
+            "# 🎲 Smart Img2Img Composer v1.0 Stable\n"
             + t("tab_header")
         )
 
