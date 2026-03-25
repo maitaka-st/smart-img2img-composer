@@ -34,6 +34,7 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 13. **Complete Internationalization (i18n)**: All UI elements support English and Japanese.
 ## 📜 Version History
 
+- **v1.0 (Stable)**: **Official Release**. Integrated 15 critical bug fixes, added Global Category Toggle, optimized accordion default states, and significantly improved overall stability.
 - **v2.4.2**: **Refined Health Check** (localized ✅/❌ icons), **UI Stability Fixes** (Gradio crash fix), and updated manual.
 - **v2.4.1**: **LoRA Global Offset**, **Output Sorting**, and bug fixes for folder paths.
 - **v2.4.0**: **Preset System** (Save/Load configurations) and UI/UX overhaul.
@@ -47,23 +48,22 @@ Smart Img2Img Composer eliminates the hassle of manually changing prompts and ba
 ### ⚙️ Settings & Preview
 Configure your image folder, memo file, matching threshold, and preview results at a glance.
 
-![Settings & Preview](docs/images/ui_settings_en.png)
+![Settings & Preview](docs/images/ui_settings_ja.png)
 
 ### 🏷️ LoRA Manager
 Register and edit your Character or Situation LoRA lists. You can easily append new entries one by one using the dedicated input form (automatic newline insertion), or edit the entire list directly in the text area.
 
-![LoRA Manager](docs/images/ui_lora_manager_en.png)
+![LoRA Manager](docs/images/ui_lora_manager_ja.png)
 
-### 🏷️ Prompt Auto-Generation (WD14 Tagger)
-Upload an image to auto-extract tags with smart category filtering — composition, pose, lighting, NSFW, and more.
+### ✨ Prompt Auto-Generation (WD14 Tagger)
+Upload an image to auto-extract tags with smart category filtering — composition, pose, lighting, NSFW, and more. Use custom dictionaries to transform tags into your favorite style.
 
-![Prompt Auto-Generation](docs/images/ui_prompt_gen_en.png)
+![Prompt Auto-Generation](docs/images/ui_autogen_ja.png)
 
 ### 🎲 img2img Integration
-Enable the extension directly in the img2img tab with a single checkbox. It works seamlessly alongside other scripts.
-You can also toggle auto-resizing and configure the base resolution via a slider to optimize sizing for your specific SD model.
+Enable the extension directly in the img2img tab with a single checkbox. It works seamlessly alongside other scripts. Use the optimized accordion to manage random slot injections and auto-resizing.
 
-![img2img Integration](docs/images/ui_img2img_en.png)
+![img2img Integration](docs/images/ui_img2img_ja.png)
 
 ---
 
