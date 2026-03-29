@@ -39,11 +39,8 @@ _I18N = {
     "sn_mode_overwrite": {"en": "Overwrite", "ja": "上書き"},
     "smart_negative_mode": {"en": "Mode", "ja": "ネガティブ挿入モード"},
     "auto_lora_enabled":        {"en": "Auto LoRA Apply",          "ja": "LoRA 自動適用"},
-    "auto_optimize":             {"en": "✨ Auto-Optimize Prompt",   "ja": "✨ プロンプト自動最適化"},
     "preview_output":            {"en": "Preview Output",            "ja": "プレビュー出力"},
-    "sn_mode":                   {"en": "Negative Mode",             "ja": "ネガティブ挿入モード"},
     "fallback_enabled": {"en": "Fallback Section", "ja": "一致しない場合は [default] セクションを使用"},
-    "auto_lora": {"en": "Auto LoRA Detect", "ja": "メモ内の LoRA を自動適用"},
     "output_settings": {"en": "Output Management", "ja": "出力設定"},
     "sort_mode": {"en": "Sort Subfolders", "ja": "サブフォルダ分け"},
     "sort_none": {"en": "None", "ja": "なし"},
@@ -91,7 +88,6 @@ _I18N = {
     "cat_nsfw_fetish": {"en": "Fetish / Kink", "ja": "フェティッシュ"},
     "cat_nsfw_clothes_mess": {"en": "Undressing", "ja": "着衣乱れ・露出"},
     "cat_nsfw_genitals": {"en": "Genitals", "ja": "局部・性器"},
-    "cat_nsfw_mosaic": {"en": "Mosaic / Censor", "ja": "モザイク・検知"},
     "cat_nsfw_scenario": {"en": "Scenarios", "ja": "シチュエーション・特殊"},
     "btn_toggle_cat": {"en": "Select All / Deselect All", "ja": "全選択 / 解除"},
     
@@ -218,8 +214,6 @@ This extension is a powerful tool to synchronize your image metadata with your p
     "log_all_tags": {"en": "{count} tags found", "ja": "{count} 個のタグを検出"},
     "log_filtered_tags": {"en": "{count} tags picked", "ja": "{count} 個のタグを抽出"},
     "log_custom_match": {"en": "Rule hit: {cond} -> {prompt}", "ja": "カスタムルール一致: {cond} -> {prompt}"},
-    "health_check_ok": {"en": "Healthy", "ja": "正常"},
-    "health_check_err": {"en": "Error: {path}", "ja": "エラー: {path}"},
 
     # --- 欠損していたキー群の追加 ---
     "pos_label": {"en": "Injection Position", "ja": "挿入位置"},

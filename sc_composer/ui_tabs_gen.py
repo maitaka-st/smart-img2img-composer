@@ -3,7 +3,7 @@ import gradio as gr
 from .i18n import t
 from .core import load_config, append_to_memo
 from .tagger import autogen_prompt
-from .constants import WILD_1_PATH, _CAT_BASE_KEYS, _CAT_CHAR_KEYS, _CAT_NSFW_KEYS, _TAG_CATEGORIES
+from .constants import _CAT_BASE_KEYS, _CAT_CHAR_KEYS, _CAT_NSFW_KEYS
 
 def on_tab_prompt_gen():
     config = load_config()
@@ -103,7 +103,6 @@ def on_tab_prompt_gen():
         return gr.update(value=keys)
 
     def toggle_all(b, c, n):
-        from .constants import _CAT_BASE_KEYS, _CAT_CHAR_KEYS, _CAT_NSFW_KEYS
         if b or c or n: return gr.update(value=[]), gr.update(value=[]), gr.update(value=[])
         return gr.update(value=_CAT_BASE_KEYS), gr.update(value=_CAT_CHAR_KEYS), gr.update(value=_CAT_NSFW_KEYS)
 
