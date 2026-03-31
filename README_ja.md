@@ -1,4 +1,4 @@
-# <img src="docs/images/icon.jpg" width="36" style="border-radius: 8px; vertical-align: bottom;" /> Smart Img2Img Composer v1.2.2 Stable
+# <img src="docs/images/icon.jpg" width="36" style="border-radius: 8px; vertical-align: bottom;" /> Smart Img2Img Composer v1.2.3 Stable
 
 [English Version (README.md)](README.md)
 
@@ -26,7 +26,7 @@
 
 ---
 
-## ✨ v1.2.2 の全機能紹介 (Full Features)
+## ✨ v1.2.3 の全機能紹介 (Full Features)
 
 ### 🧠 参照画像の自律解析とプロンプト構築 (Tagger Analyzer)
 ![タグ解析とプロンプト自動生成](docs/images/ja2.png)
@@ -70,4 +70,4 @@
 4. **img2img の実行**: `img2img` タブを開き、アコーディオン内の `Enable` にチェックを入れて「Generate」ボタンを押すと、フォルダ内の画像に対して自動でプロンプト処理と画像生成が連続実行されます！
 
 ---
-*Developed by Antigravity / 画像生成 by Gemini / v1.2.2*
+*Developed by Antigravity / 画像生成 by Gemini / v1.2.3*

@@ -11,12 +11,13 @@ def on_ui_tabs():
     try:
         from .ui_tabs_gen import on_tab_prompt_gen
         from .ui_tabs_lora import on_tab_lora_manager
+        from .ui_tabs_inventory import on_tab_inventory
 
         config = load_config()
 
         # 旧版に倣い、Block内部で丁寧に構築
         with gr.Blocks(analytics_enabled=False) as tab_interface:
-            gr.Markdown(f"# 🎲 Smart Img2Img Composer v1.2.2 Stable\n{t('tab_header')}")
+            gr.Markdown(f"# 🎲 Smart Img2Img Composer v1.2.3 Stable\n{t('tab_header')}")
 
             with gr.Tabs() as tabs_root:
                 # --- Tab 1: Settings & Preview ---
@@ -67,7 +68,8 @@ def on_ui_tabs():
                             with gr.Group():
                                 fallback_enabled = gr.Checkbox(label=t("fallback_enabled"), value=lambda: load_config().get("fallback_enabled", True))
                                 auto_lora_enabled = gr.Checkbox(label=t("auto_lora_enabled"), value=lambda: load_config().get("auto_lora_enabled", True))
-                                inventory_mode = gr.Checkbox(label=t("inventory_mode"), value=lambda: load_config().get("inventory_mode", False))
+                                # inventory_mode は「在庫管理」タブに移動しました
+                                pass
                             
                             with gr.Group():
                                 auto_optimize_prompt = gr.Checkbox(label=t("auto_optimize_prompt"), value=lambda: load_config().get("auto_optimize_prompt", False))
@@ -115,7 +117,11 @@ def on_ui_tabs():
                 with gr.Tab(t("tab_lora_manager")):
                     on_tab_lora_manager()
 
-                # --- Tab 4: Manual ---
+                # --- Tab 4: Inventory Control ---
+                with gr.Tab(t("tab_inventory")):
+                    inventory_mode = on_tab_inventory()
+
+                # --- Tab 5: Manual ---
                 with gr.Tab(t("tab_usage")):
                     gr.Markdown(t("usage_md"))
 

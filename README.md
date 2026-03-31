@@ -1,4 +1,4 @@
-# <img src="docs/images/icon.jpg" width="36" style="border-radius: 8px; vertical-align: bottom;" /> Smart Img2Img Composer v1.2.2 Stable
+# <img src="docs/images/icon.jpg" width="36" style="border-radius: 8px; vertical-align: bottom;" /> Smart Img2Img Composer v1.2.3 Stable
 
 [日本語版 (README_ja.md)](README_ja.md)
 

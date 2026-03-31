@@ -20,7 +20,7 @@ from sc_composer.core import load_config, compose_prompt, pick_random_assets
 
 class RandomComposerScript(scripts.Script):
     def title(self):
-        return "Smart Img2Img Composer v1.2.2"
+        return "Smart Img2Img Composer v1.2.3"
 
     def show(self, is_img2img):
         return scripts.AlwaysVisible if is_img2img else False

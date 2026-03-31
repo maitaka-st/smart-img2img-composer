@@ -230,6 +230,7 @@ def handle_load_preset(name):
         p.get("lora_offset", 0.0), p.get("gen_conf_mosaic_auto", False), p.get("gen_conf_mosaic_level", t("mosaic_med")),
         p.get("gen_custom_dict_enabled", True),
         p.get("auto_optimize_prompt", False), p.get("custom_base_tags", ""), p.get("active_profile", "Standard / SDXL"),
+        p.get("prompt_polish", False), p.get("smart_negative", False), p.get("smart_negative_mode", "append"),
         p.get("inventory_mode", False), p.get("limit_base", 10),
         p.get("limit_char", 10), p.get("limit_nsfw", 15),
         c_base, c_char, c_nsfw,
