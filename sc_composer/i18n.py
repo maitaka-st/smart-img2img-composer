@@ -147,7 +147,7 @@ _I18N = {
     # Manual
     "usage_md": {
         "en": """
-### 🎲 How to Use Smart Img2Img Composer v1.2
+### 🎲 How to Use Smart Img2Img Composer v1.2.2
 
 This extension is a powerful tool to synchronize your image metadata with your prompt generation workflow.
 
@@ -172,7 +172,7 @@ This extension is a powerful tool to synchronize your image metadata with your p
 *Created by Antigravity Team*
         """,
         "ja": """
-### 🎲 Smart Img2Img Composer v1.2 マニュアル
+### 🎲 Smart Img2Img Composer v1.2.2 マニュアル
 
 本拡張機能は、参照画像のファイル名とメモファイルを紐付け、複雑な img2img 構成を自動化するプロフェッショナルツールです。
 

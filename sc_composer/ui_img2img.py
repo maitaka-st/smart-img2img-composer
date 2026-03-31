@@ -94,7 +94,7 @@ def on_ui_img2img():
                 label=t("sort_mode"),
                 # Internal keys: "None", "By Preset", "By Section", "By Date"
                 choices=[(t("sort_none"), "None"), (t("sort_preset"), "By Preset"), (t("sort_section"), "By Section"), (t("sort_date"), "By Date")],
-                value="None"
+                value=lambda: load_config().get("output_sort_mode", "None")
             )
             auto_filename_chk = gr.Checkbox(
                 label=t("auto_filename"),
