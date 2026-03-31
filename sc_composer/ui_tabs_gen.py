@@ -24,7 +24,7 @@ def on_tab_prompt_gen():
             with gr.Accordion(t("cat_base"), open=True):
                 with gr.Row(equal_height=True):
                     btn_toggle_cat_base = gr.Button("🔄", variant="secondary", size="sm", min_width=40, scale=0)
-                    conf_base = gr.Number(value=0.35, minimum=0.0, maximum=1.0, step=0.01, show_label=False, container=False, min_width=80, scale=0)
+                    conf_base = gr.Number(value=lambda: load_config().get("gen_conf_base", 0.35), minimum=0.0, maximum=1.0, step=0.01, show_label=False, container=False, min_width=80, scale=0)
                     gen_cat_base = gr.CheckboxGroup(
                         choices=[(t(c), c) for c in _CAT_BASE_KEYS],
                         value=["cat_composition", "cat_pose", "cat_background", "cat_atmosphere"],
@@ -35,7 +35,7 @@ def on_tab_prompt_gen():
             with gr.Accordion(t("cat_char"), open=False):
                 with gr.Row(equal_height=True):
                     btn_toggle_cat_char = gr.Button("🔄", variant="secondary", size="sm", min_width=40, scale=0)
-                    conf_char = gr.Number(value=0.35, minimum=0.0, maximum=1.0, step=0.01, show_label=False, container=False, min_width=80, scale=0)
+                    conf_char = gr.Number(value=lambda: load_config().get("gen_conf_char", 0.35), minimum=0.0, maximum=1.0, step=0.01, show_label=False, container=False, min_width=80, scale=0)
                     gen_cat_char = gr.CheckboxGroup(
                         choices=[(t(c), c) for c in _CAT_CHAR_KEYS],
                         value=["cat_char_face", "cat_char_male"],
@@ -46,7 +46,7 @@ def on_tab_prompt_gen():
             with gr.Accordion(t("cat_nsfw"), open=False):
                 with gr.Row(equal_height=True):
                     btn_toggle_cat_nsfw = gr.Button("🔄", variant="secondary", size="sm", min_width=40, scale=0)
-                    conf_nsfw = gr.Number(value=0.35, minimum=0.0, maximum=1.0, step=0.01, show_label=False, container=False, min_width=80, scale=0)
+                    conf_nsfw = gr.Number(value=lambda: load_config().get("gen_conf_nsfw", 0.35), minimum=0.0, maximum=1.0, step=0.01, show_label=False, container=False, min_width=80, scale=0)
                     gen_cat_nsfw = gr.CheckboxGroup(
                         choices=[(t(c), c) for c in _CAT_NSFW_KEYS],
                         value=[k for k in _CAT_NSFW_KEYS if k != "cat_nsfw_clothes_mess"],
@@ -65,7 +65,7 @@ def on_tab_prompt_gen():
                 with gr.Row(equal_height=True):
                     use_global_conf = gr.Checkbox(label=t("use_global_conf"), value=True, min_width=0)
                     gr.HTML(f"<span style='font-size: 0.85em; color: gray; margin-left: 10px; white-space: nowrap;'>{t('use_global_conf_info')}</span>")
-                gen_confidence = gr.Slider(label=t('conf_total'), minimum=0.0, maximum=1.0, step=0.05, value=0.35)
+                gen_confidence = gr.Slider(label=t('conf_total'), minimum=0.0, maximum=1.0, step=0.05, value=lambda: load_config().get("gen_conf_total", 0.35))
 
             gen_positive = gr.Textbox(label=t("default_positive"), placeholder="masterpiece, 1girl...", lines=2, value=lambda: load_config().get("gen_positive", ""))
             gen_negative = gr.Textbox(label=t("default_negative"), placeholder="lowres, bad anatomy...", lines=2, value=lambda: load_config().get("gen_negative", ""))
@@ -75,8 +75,8 @@ def on_tab_prompt_gen():
                 gen_custom_dict = gr.Textbox(label=t("custom_dict"), placeholder="night > neon lights...", lines=3, value=lambda: load_config().get("gen_custom_dict", ""))
 
             with gr.Accordion(t("h_mosaic_settings"), open=False):
-                gen_mosaic_auto = gr.Checkbox(label=t("gen_mosaic_auto"), value=False)
-                gen_mosaic_level = gr.Radio(label=t("gen_mosaic_level"), choices=[t("mosaic_low"), t("mosaic_med"), t("mosaic_high")], value=t("mosaic_med"))
+                gen_mosaic_auto = gr.Checkbox(label=t("gen_mosaic_auto"), value=lambda: load_config().get("gen_conf_mosaic_auto", False))
+                gen_mosaic_level = gr.Radio(label=t("gen_mosaic_level"), choices=[t("mosaic_low"), t("mosaic_med"), t("mosaic_high")], value=lambda: load_config().get("gen_conf_mosaic_level", t("mosaic_med")))
                 gr.Markdown(t("mosaic_layer_1"))
                 gen_cat_mosaic = gr.CheckboxGroup(
                     choices=[("mosaic_censoring", "mosaic_censoring"), ("bar_censor", "bar_censor"), ("censored", "censored"), ("uncensored", "uncensored"), ("detailed_mosaic", "detailed_mosaic")],

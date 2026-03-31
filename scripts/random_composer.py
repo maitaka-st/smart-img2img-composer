@@ -20,7 +20,7 @@ from sc_composer.core import load_config, compose_prompt, pick_random_assets
 
 class RandomComposerScript(scripts.Script):
     def title(self):
-        return "Smart Img2Img Composer v1.2"
+        return "Smart Img2Img Composer v1.2.2"
 
     def show(self, is_img2img):
         return scripts.AlwaysVisible if is_img2img else False
@@ -70,7 +70,12 @@ class RandomComposerScript(scripts.Script):
         match_threshold = config.get("match_threshold", 0.3); inventory_mode = config.get("inventory_mode", False)
 
         sel_mode_str = "sequential" if "sequential" in str(selection_mode).lower() else "random"
-        img_path, pos, neg, log, section_name = compose_prompt(image_folder, memo_file, match_threshold, selection_mode=sel_mode_str)
+        img_path, pos, neg, log, section_name = compose_prompt(
+            image_folder, memo_file, match_threshold,
+            fallback=config.get("fallback_enabled", True),
+            auto_l=config.get("auto_lora_enabled", True),
+            selection_mode=sel_mode_str
+        )
         if not img_path: return
 
         from PIL import Image

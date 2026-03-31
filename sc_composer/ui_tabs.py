@@ -16,7 +16,7 @@ def on_ui_tabs():
 
         # 旧版に倣い、Block内部で丁寧に構築
         with gr.Blocks(analytics_enabled=False) as tab_interface:
-            gr.Markdown(f"# 🎲 Smart Img2Img Composer v1.2 Stable\n{t('tab_header')}")
+            gr.Markdown(f"# 🎲 Smart Img2Img Composer v1.2.2 Stable\n{t('tab_header')}")
 
             with gr.Tabs() as tabs_root:
                 # --- Tab 1: Settings & Preview ---

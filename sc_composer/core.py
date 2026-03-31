@@ -123,18 +123,18 @@ def compose_prompt(folder, memo, threshold, fallback=True, auto_l=True, l_off=0.
         raise ValueError(f"画像フォルダが存在しません: {folder}")
     if memo and not os.path.isfile(memo):
         print(f"[Smart Composer] 警告: メモファイルが存在しません: {memo}")
-    return _compose_core(folder, memo, threshold, selection_mode=selection_mode, _dbg=_dbg)
+    return _compose_core(folder, memo, threshold, fallback=fallback, auto_l=auto_l, selection_mode=selection_mode, _dbg=_dbg)
 
 def compose_prompt_preview(folder, memo, threshold, fallback=True, auto_l=True, l_off=0.0, w1="", w2="", w3="", prof_name="Standard / SDXL", inv_mode=False):
     """設定タブの「構成テスト」ボタン用: プレビュー文字列を返す。"""
-    img, pos, neg, log, sec = _compose_core(folder, memo, threshold)
+    img, pos, neg, log, sec = _compose_core(folder, memo, threshold, fallback=fallback, auto_l=auto_l)
     if not img: return log
     from .constants import PROMPT_PROFILES
     profile = PROMPT_PROFILES.get(prof_name, next(iter(PROMPT_PROFILES.values())))
     p_neg = profile.get("neg", "")
     return f"--- PREVIEW ---\nSection: [{sec}]\nImage: {os.path.basename(img)}\n\nPositive:\n{pos}\n\nNegative:\n{neg}\n(Profile Neg: {p_neg})\n\nLog:\n{log}"
 
-def _compose_core(folder, memo, threshold, selection_mode="random", _dbg=False):
+def _compose_core(folder, memo, threshold, fallback=True, auto_l=True, selection_mode="random", _dbg=False):
     from .utils import get_image_files, _clean_path
     folder_clean = _clean_path(folder)
     memo_clean = _clean_path(memo)
@@ -161,14 +161,14 @@ def _compose_core(folder, memo, threshold, selection_mode="random", _dbg=False):
         if _dbg: print(f"[SC_DEBUG]   match: '{fname}' vs '{k}' = {sc:.3f}")
         if sc >= threshold and sc > best_score: best_score, best_sec = sc, k
     if not best_sec:
-        if "default" in sections: best_sec = "default"
+        if fallback and "default" in sections: best_sec = "default"
         else: return sel, "", "", t("log_no_match"), ""
     
     data = sections[best_sec]
     pos = data.get("positive", "")
     neg = data.get("negative", "")
     loras = data.get("lora", [])
-    if loras:
+    if auto_l and loras:
         pos = ", ".join([pos] + loras) if pos else ", ".join(loras)
     if _dbg: print(f"[SC_DEBUG] _compose_core: sec={best_sec}, score={best_score:.3f}, pos_len={len(pos)}, neg_len={len(neg)}, loras={len(loras)}")
     return sel, pos, neg, f"Matched: {best_sec} ({best_score:.2f})", best_sec
@@ -186,10 +186,10 @@ def save_all_settings(lang, img_f, memo, threshold, count, fallback, auto_l, con
     config.update({
         "language": lang, "image_folder": _clean_path(img_f), "memo_file": _clean_path(memo),
         "match_threshold": threshold, "generation_count": count, "fallback_enabled": fallback,
-        "auto_lora_enabled": auto_l, "gen_confidence": confidence, "gen_positive": pos,
+        "auto_lora_enabled": auto_l, "gen_conf_total": confidence, "gen_positive": pos,
         "gen_negative": neg, "gen_custom_dict": c_dict, "gen_categories": list(c_base) + list(c_char) + list(c_nsfw),
         "wildcard_1_path": _clean_path(w1), "wildcard_2_path": _clean_path(w2), "wildcard_3_path": _clean_path(w3),
-        "lora_offset": offset, "output_sort_mode": sort_mode, "auto_filename": auto_file, "gen_mosaic_auto": mosaic_auto, "gen_mosaic_level": mosaic_level,
+        "lora_offset": offset, "output_sort_mode": sort_mode, "auto_filename": auto_file, "gen_conf_mosaic_auto": mosaic_auto, "gen_conf_mosaic_level": mosaic_level,
         "gen_custom_dict_enabled": c_dict_enabled, "auto_optimize_prompt": auto_opt, "custom_base_tags": custom_tags,
         "active_profile": active_prof, "prompt_polish": polish, "smart_negative": smart_neg,
         "smart_negative_mode": smart_neg_mode, "inventory_mode": inventory_mode,
@@ -207,7 +207,7 @@ def handle_load_preset(name):
         True, True,               # fallback, auto_lora
         0.35, "", "", "",         # confidence, pos, neg, custom_dict
         "", "", "",               # w1, w2, w3
-        0.0, False, "Med", True,  # lora_offset, mosaic_auto, mosaic_level, custom_dict_enabled
+        0.0, False, t("mosaic_med"), True,  # lora_offset, mosaic_auto, mosaic_level, custom_dict_enabled
         False, "", "Standard / SDXL",  # auto_opt, custom_tags, profile
         False, False, "append",   # polish, smart_neg, sn_mode
         False, 10, 10, 15,        # inventory_mode, limit_base, limit_char, limit_nsfw
@@ -224,17 +224,16 @@ def handle_load_preset(name):
     return (
         p.get("image_folder", ""), p.get("memo_file", ""), p.get("match_threshold", 0.3), p.get("generation_count", 1),
         p.get("fallback_enabled", True), p.get("auto_lora_enabled", True),
-        p.get("gen_confidence", 0.35), p.get("gen_positive", ""), p.get("gen_negative", ""),
+        p.get("gen_conf_total", 0.35), p.get("gen_positive", ""), p.get("gen_negative", ""),
         p.get("gen_custom_dict", ""), 
         p.get("wildcard_1_path", WILD_1_PATH), p.get("wildcard_2_path", WILD_2_PATH), p.get("wildcard_3_path", WILD_3_PATH),
-        p.get("lora_offset", 0.0), p.get("gen_mosaic_auto", False), p.get("gen_mosaic_level", "Med"),
+        p.get("lora_offset", 0.0), p.get("gen_conf_mosaic_auto", False), p.get("gen_conf_mosaic_level", t("mosaic_med")),
         p.get("gen_custom_dict_enabled", True),
         p.get("auto_optimize_prompt", False), p.get("custom_base_tags", ""), p.get("active_profile", "Standard / SDXL"),
-        p.get("prompt_polish", False), p.get("smart_negative", False), p.get("smart_negative_mode", "append"),
         p.get("inventory_mode", False), p.get("limit_base", 10),
         p.get("limit_char", 10), p.get("limit_nsfw", 15),
         c_base, c_char, c_nsfw,
-        p.get("conf_base", 0.35), p.get("conf_char", 0.35), p.get("conf_nsfw", 0.35),
+        p.get("gen_conf_base", 0.35), p.get("gen_conf_char", 0.35), p.get("gen_conf_nsfw", 0.35),
         p.get("use_global_conf", True)
     )
 
@@ -245,15 +244,15 @@ def handle_save_preset(name, *args):
     presets[name.strip()] = {
         "image_folder": args[0], "memo_file": args[1], "match_threshold": args[2],
         "generation_count": args[3], "fallback_enabled": args[4], "auto_lora_enabled": args[5],
-        "gen_confidence": args[6], "gen_positive": args[7], "gen_negative": args[8],
+        "gen_conf_total": args[6], "gen_positive": args[7], "gen_negative": args[8],
         "gen_custom_dict": args[9], "wildcard_1_path": args[10], "wildcard_2_path": args[11],
-        "wildcard_3_path": args[12], "lora_offset": args[13], "gen_mosaic_auto": args[14],
-        "gen_mosaic_level": args[15], "gen_custom_dict_enabled": args[16],
+        "wildcard_3_path": args[12], "lora_offset": args[13], "gen_conf_mosaic_auto": args[14],
+        "gen_conf_mosaic_level": args[15], "gen_custom_dict_enabled": args[16],
         "auto_optimize_prompt": args[17], "custom_base_tags": args[18], "active_profile": args[19],
         "prompt_polish": args[20], "smart_negative": args[21], "smart_negative_mode": args[22],
         "inventory_mode": args[23], "limit_base": args[24], "limit_char": args[25],
         "limit_nsfw": args[26], "gen_categories": list(args[27]) + list(args[28]) + list(args[29]),
-        "conf_base": args[30], "conf_char": args[31], "conf_nsfw": args[32], "use_global_conf": args[33]
+        "gen_conf_base": args[30], "gen_conf_char": args[31], "gen_conf_nsfw": args[32], "use_global_conf": args[33]
     }
     config["presets"] = presets; config["last_preset"] = name.strip(); save_config(config)
     import gradio as gr
